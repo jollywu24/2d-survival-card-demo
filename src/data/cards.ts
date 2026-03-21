@@ -1,0 +1,127 @@
+import type { CardDefinition } from '../types/game';
+
+export const starterDeck: CardDefinition[] = [
+  {
+    id: 'gather-berries',
+    name: '采集浆果',
+    type: 'resource',
+    description: '在附近搜寻可食用浆果，稍微恢复饥饿，但会消耗体力。',
+    effect: {
+      statChanges: { hunger: 14, fatigue: -6, sanity: 2 },
+    },
+    condition: {
+      allowedTerrains: ['beach', 'jungle'],
+      allowedTime: ['day'],
+    },
+  },
+  {
+    id: 'collect-rainwater',
+    name: '收集淡水',
+    type: 'resource',
+    description: '利用叶片和容器收集雨水，显著缓解口渴。',
+    effect: {
+      statChanges: { thirst: 20, fatigue: -4 },
+    },
+    condition: {
+      allowedWeather: ['rain', 'storm'],
+    },
+  },
+  {
+    id: 'fish-shore',
+    name: '岸边捕鱼',
+    type: 'action',
+    description: '在海滩尝试捕鱼，补充食物但会增加疲劳。',
+    effect: {
+      statChanges: { hunger: 18, fatigue: -10 },
+    },
+    condition: {
+      allowedTerrains: ['beach'],
+      allowedTime: ['day'],
+    },
+  },
+  {
+    id: 'light-fire',
+    name: '生火取暖',
+    type: 'tool',
+    description: '保持体温并稳定精神，夜晚尤其有用。',
+    effect: {
+      statChanges: { temperature: 16, sanity: 6, fatigue: -4 },
+    },
+    condition: {
+      allowedTime: ['night'],
+    },
+  },
+  {
+    id: 'build-shelter',
+    name: '搭建庇护所',
+    type: 'tool',
+    description: '临时庇护所让你更安全，也更容易休息。',
+    effect: {
+      statChanges: { sanity: 8, fatigue: -8, health: 4 },
+    },
+    condition: {
+      allowedTerrains: ['beach', 'jungle'],
+    },
+  },
+  {
+    id: 'explore-jungle',
+    name: '探索丛林',
+    type: 'action',
+    description: '进入丛林寻找资源，有机会发现更多机会。',
+    effect: {
+      statChanges: { fatigue: -10, thirst: -6 },
+      moveTerrain: 'jungle',
+      drawCards: 1,
+      eventChanceBonus: 0.15,
+    },
+    condition: {
+      allowedTerrains: ['beach'],
+      allowedTime: ['day'],
+    },
+  },
+  {
+    id: 'enter-cave',
+    name: '进入洞穴',
+    type: 'action',
+    description: '洞穴更安全，但也会带来未知风险。',
+    effect: {
+      statChanges: { sanity: -4, temperature: 10 },
+      moveTerrain: 'cave',
+      eventChanceBonus: 0.1,
+    },
+  },
+  {
+    id: 'rest',
+    name: '闭眼休息',
+    type: 'action',
+    description: '恢复体力，但时间会流逝，夜里恢复效果更好。',
+    effect: {
+      statChanges: { fatigue: 18, sanity: 6, hunger: -4, thirst: -4 },
+      rest: true,
+    },
+  },
+  {
+    id: 'observe-sky',
+    name: '观察天色',
+    type: 'event',
+    description: '留意云层和海风，提升对环境的把握。',
+    effect: {
+      statChanges: { sanity: 4 },
+      drawCards: 1,
+    },
+  },
+  {
+    id: 'craft-spear',
+    name: '制作木矛',
+    type: 'tool',
+    description: '简单工具能让后续生存更容易。',
+    effect: {
+      statChanges: { sanity: 5, fatigue: -6 },
+      drawCards: 1,
+    },
+    condition: {
+      allowedTerrains: ['beach', 'jungle'],
+      allowedTime: ['day'],
+    },
+  },
+];

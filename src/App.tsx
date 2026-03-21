@@ -1,13 +1,14 @@
 ﻿import type { CSSProperties } from 'react';
 import { CardCanvas } from './components/CardCanvas';
 import {
+  getItemDefinition,
+  meetsCondition,
   terrainLabel,
   timeLabel,
   useGameStore,
   weatherLabel,
-  meetsCondition,
 } from './store/gameStore';
-import type { StatKey } from './types/game';
+import type { BackpackSlot, StatKey } from './types/game';
 
 const statMeta: Record<
   StatKey,
@@ -29,24 +30,41 @@ function App() {
     player,
     environment,
     hand,
+    backpack,
+    selectedBackpackSlot,
     activeEvent,
     logs,
     nextTurn,
     resetGame,
     resolveEvent,
+    selectBackpackSlot,
+    moveSelectedToSlot,
+    useBackpackItem,
+    discardBackpackItem,
     useCard,
   } = useGameStore();
 
   const clockProgress = ((environment.turn - 1) % 2) / 2;
+  const selectedSlot =
+    selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
+  const selectedItem = selectedSlot ? getItemDefinition(selectedSlot.itemId) : null;
+
+  const handleSlotClick = (slot: BackpackSlot) => {
+    if (selectedBackpackSlot !== null && selectedBackpackSlot !== slot.slotIndex) {
+      moveSelectedToSlot(slot.slotIndex);
+      return;
+    }
+    selectBackpackSlot(slot.slotIndex);
+  };
 
   return (
     <main className="app-shell">
       <section className="hero-panel">
         <div>
           <p className="eyebrow">2D 荒野求生卡牌 Demo</p>
-          <h1>在回合推进与状态联动中活下去</h1>
+          <h1>在回合推进、卡牌与背包整理中活下去</h1>
           <p className="hero-copy">
-            首版包含 10 张基础卡牌、随机事件、环境变化与生存状态联动。
+            现在已支持基础背包系统，获得的物品可以在格子里摆放、使用和丢弃。
           </p>
         </div>
         <div className="hero-actions">
@@ -106,7 +124,7 @@ function App() {
           <div className="survival-notes">
             <SurvivalRule title="昼夜" text="夜晚会持续拉低理智与体力，生火与休息更关键。" />
             <SurvivalRule title="气候" text="雨天和风暴会压低体温，洞穴和火源更安全。" />
-            <SurvivalRule title="联动" text="饥饿、缺水、低温都会反向吞掉生命值。" />
+            <SurvivalRule title="背包" text="先点选一个物品，再点另一个格子就能重新摆放。" />
           </div>
         </div>
       </section>
@@ -125,6 +143,71 @@ function App() {
           </div>
         </section>
       )}
+
+      <section className="panel backpack-panel">
+        <div className="panel-title">背包</div>
+        <div className="backpack-layout">
+          <div>
+            <div className="backpack-grid">
+              {backpack.map((slot) => {
+                const item = getItemDefinition(slot.itemId);
+                return (
+                  <button
+                    key={slot.slotIndex}
+                    type="button"
+                    className={`backpack-slot ${selectedBackpackSlot === slot.slotIndex ? 'selected' : ''} ${item ? 'filled' : ''}`}
+                    onClick={() => handleSlotClick(slot)}
+                  >
+                    <span className="slot-index">{slot.slotIndex + 1}</span>
+                    {item ? (
+                      <>
+                        <span className="slot-icon">{item.icon}</span>
+                        <span className="slot-amount">x{slot.amount}</span>
+                      </>
+                    ) : (
+                      <span className="slot-empty">空</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="inventory-detail">
+            <div className="inventory-card">
+              {selectedItem && selectedSlot && selectedSlot.itemId ? (
+                <>
+                  <div className="inventory-icon">{selectedItem.icon}</div>
+                  <h3>{selectedItem.name}</h3>
+                  <p>{selectedItem.description}</p>
+                  <div className="inventory-meta">
+                    <span>数量 x{selectedSlot.amount}</span>
+                    <span>类型 {selectedItem.type}</span>
+                  </div>
+                  <div className="inventory-actions">
+                    <button type="button" onClick={() => useBackpackItem(selectedSlot.slotIndex)}>
+                      使用
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => discardBackpackItem(selectedSlot.slotIndex)}
+                    >
+                      丢弃
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="inventory-icon empty">🎒</div>
+                  <h3>选择一个背包格子</h3>
+                  <p>已选中的物品可以被使用或丢弃；再次点击其他格子可以交换位置。</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="panel">
         <div className="panel-title">手牌</div>

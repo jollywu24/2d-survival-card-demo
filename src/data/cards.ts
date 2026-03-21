@@ -1,13 +1,14 @@
-import type { CardDefinition } from '../types/game';
+﻿import type { CardDefinition } from '../types/game';
 
 export const starterDeck: CardDefinition[] = [
   {
     id: 'gather-berries',
     name: '采集浆果',
     type: 'resource',
-    description: '在附近搜寻可食用浆果，稍微恢复饥饿，但会消耗体力。',
+    description: '在附近搜寻可食用浆果，补充食物并带回一些存货。',
     effect: {
-      statChanges: { hunger: 14, fatigue: -6, sanity: 2 },
+      statChanges: { hunger: 8, fatigue: -6, sanity: 2 },
+      gainItems: [{ itemId: 'berries', amount: 2 }],
     },
     condition: {
       allowedTerrains: ['beach', 'jungle'],
@@ -18,9 +19,10 @@ export const starterDeck: CardDefinition[] = [
     id: 'collect-rainwater',
     name: '收集淡水',
     type: 'resource',
-    description: '利用叶片和容器收集雨水，显著缓解口渴。',
+    description: '利用叶片和容器收集雨水，为背包补充可饮用的淡水。',
     effect: {
-      statChanges: { thirst: 20, fatigue: -4 },
+      statChanges: { thirst: 8, fatigue: -4 },
+      gainItems: [{ itemId: 'fresh-water', amount: 2 }],
     },
     condition: {
       allowedWeather: ['rain', 'storm'],
@@ -30,9 +32,10 @@ export const starterDeck: CardDefinition[] = [
     id: 'fish-shore',
     name: '岸边捕鱼',
     type: 'action',
-    description: '在海滩尝试捕鱼，补充食物但会增加疲劳。',
+    description: '在海滩尝试捕鱼，成功的话能把鲜鱼带回背包。',
     effect: {
-      statChanges: { hunger: 18, fatigue: -10 },
+      statChanges: { fatigue: -10 },
+      gainItems: [{ itemId: 'raw-fish', amount: 1 }],
     },
     condition: {
       allowedTerrains: ['beach'],
@@ -55,9 +58,10 @@ export const starterDeck: CardDefinition[] = [
     id: 'build-shelter',
     name: '搭建庇护所',
     type: 'tool',
-    description: '临时庇护所让你更安全，也更容易休息。',
+    description: '临时庇护所让你更安全，也会留下些可重复利用的材料。',
     effect: {
       statChanges: { sanity: 8, fatigue: -8, health: 4 },
+      gainItems: [{ itemId: 'palm-fiber', amount: 2 }],
     },
     condition: {
       allowedTerrains: ['beach', 'jungle'],
@@ -67,12 +71,13 @@ export const starterDeck: CardDefinition[] = [
     id: 'explore-jungle',
     name: '探索丛林',
     type: 'action',
-    description: '进入丛林寻找资源，有机会发现更多机会。',
+    description: '进入丛林寻找资源，有机会发现草药与新机会。',
     effect: {
       statChanges: { fatigue: -10, thirst: -6 },
       moveTerrain: 'jungle',
       drawCards: 1,
       eventChanceBonus: 0.15,
+      gainItems: [{ itemId: 'herb-bundle', amount: 1 }],
     },
     condition: {
       allowedTerrains: ['beach'],
@@ -114,10 +119,11 @@ export const starterDeck: CardDefinition[] = [
     id: 'craft-spear',
     name: '制作木矛',
     type: 'tool',
-    description: '简单工具能让后续生存更容易。',
+    description: '简单工具能让后续生存更容易，并会进入你的背包。',
     effect: {
       statChanges: { sanity: 5, fatigue: -6 },
       drawCards: 1,
+      gainItems: [{ itemId: 'spear', amount: 1 }],
     },
     condition: {
       allowedTerrains: ['beach', 'jungle'],

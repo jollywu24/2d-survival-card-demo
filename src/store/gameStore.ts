@@ -1,12 +1,16 @@
 ﻿import { create } from 'zustand';
-import { randomEvents } from '../data/events';
 import { starterDeck } from '../data/cards';
+import { randomEvents } from '../data/events';
+import { itemCatalog } from '../data/items';
 import type {
+  BackpackSlot,
   CardCondition,
   CardDefinition,
   CardEffect,
   EnvironmentState,
   EventDefinition,
+  ItemDefinition,
+  ItemStackChange,
   LogEntry,
   PlayerState,
   StatKey,
@@ -17,10 +21,16 @@ interface GameState {
   environment: EnvironmentState;
   deck: CardDefinition[];
   hand: CardDefinition[];
+  backpack: BackpackSlot[];
+  selectedBackpackSlot: number | null;
   activeEvent: EventDefinition | null;
   logs: LogEntry[];
   useCard: (cardId: string) => void;
   resolveEvent: (optionId: string) => void;
+  selectBackpackSlot: (slotIndex: number) => void;
+  moveSelectedToSlot: (slotIndex: number) => void;
+  useBackpackItem: (slotIndex: number) => void;
+  discardBackpackItem: (slotIndex: number) => void;
   nextTurn: () => void;
   resetGame: () => void;
 }
@@ -28,6 +38,9 @@ interface GameState {
 const MAX_STAT = 100;
 const MIN_STAT = 0;
 const HAND_SIZE = 4;
+const BACKPACK_SIZE = 16;
+
+const itemById = new Map(itemCatalog.map((item) => [item.id, item]));
 
 const initialPlayer = (): PlayerState => ({
   health: 78,
@@ -45,6 +58,13 @@ const initialEnvironment = (): EnvironmentState => ({
   day: 1,
   turn: 1,
 });
+
+const createInitialBackpack = (): BackpackSlot[] =>
+  Array.from({ length: BACKPACK_SIZE }, (_, slotIndex) => ({
+    slotIndex,
+    itemId: null,
+    amount: 0,
+  }));
 
 const clamp = (value: number) => Math.max(MIN_STAT, Math.min(MAX_STAT, value));
 
@@ -159,14 +179,102 @@ const createLog = (text: string): LogEntry => ({
   text,
 });
 
-const createInitialState = () => ({
-  player: initialPlayer(),
-  environment: initialEnvironment(),
-  deck: starterDeck,
-  hand: starterDeck.slice(0, HAND_SIZE),
-  activeEvent: null as EventDefinition | null,
-  logs: [createLog('你在海滩醒来，身边只有零散的物资。')],
-});
+const cloneBackpack = (backpack: BackpackSlot[]) => backpack.map((slot) => ({ ...slot }));
+
+const addItemsToBackpack = (
+  backpack: BackpackSlot[],
+  gains: ItemStackChange[] = [],
+): { backpack: BackpackSlot[]; overflow: string[] } => {
+  const nextBackpack = cloneBackpack(backpack);
+  const overflow: string[] = [];
+
+  gains.forEach(({ itemId, amount }) => {
+    const item = itemById.get(itemId);
+    if (!item || amount <= 0) {
+      return;
+    }
+
+    let remaining = amount;
+
+    nextBackpack.forEach((slot) => {
+      if (remaining === 0) {
+        return;
+      }
+      if (slot.itemId !== itemId || slot.amount >= item.maxStack) {
+        return;
+      }
+
+      const canAdd = Math.min(item.maxStack - slot.amount, remaining);
+      slot.amount += canAdd;
+      remaining -= canAdd;
+    });
+
+    nextBackpack.forEach((slot) => {
+      if (remaining === 0) {
+        return;
+      }
+      if (slot.itemId !== null) {
+        return;
+      }
+
+      const canAdd = Math.min(item.maxStack, remaining);
+      slot.itemId = itemId;
+      slot.amount = canAdd;
+      remaining -= canAdd;
+    });
+
+    if (remaining > 0) {
+      overflow.push(`${item.name} x${remaining}`);
+    }
+  });
+
+  return { backpack: nextBackpack, overflow };
+};
+
+const consumeOneFromSlot = (backpack: BackpackSlot[], slotIndex: number) => {
+  const nextBackpack = cloneBackpack(backpack);
+  const slot = nextBackpack[slotIndex];
+
+  if (!slot || slot.itemId === null) {
+    return nextBackpack;
+  }
+
+  slot.amount -= 1;
+  if (slot.amount <= 0) {
+    slot.itemId = null;
+    slot.amount = 0;
+  }
+
+  return nextBackpack;
+};
+
+const swapBackpackSlots = (backpack: BackpackSlot[], fromIndex: number, toIndex: number) => {
+  const nextBackpack = cloneBackpack(backpack);
+  const fromSlot = nextBackpack[fromIndex];
+  const toSlot = nextBackpack[toIndex];
+
+  nextBackpack[fromIndex] = { ...toSlot, slotIndex: fromIndex };
+  nextBackpack[toIndex] = { ...fromSlot, slotIndex: toIndex };
+  return nextBackpack;
+};
+
+const createInitialState = () => {
+  const seeded = addItemsToBackpack(createInitialBackpack(), [
+    { itemId: 'berries', amount: 1 },
+    { itemId: 'fresh-water', amount: 1 },
+  ]).backpack;
+
+  return {
+    player: initialPlayer(),
+    environment: initialEnvironment(),
+    deck: starterDeck,
+    hand: starterDeck.slice(0, HAND_SIZE),
+    backpack: seeded,
+    selectedBackpackSlot: null as number | null,
+    activeEvent: null as EventDefinition | null,
+    logs: [createLog('你在海滩醒来，身边只有零散的物资。')],
+  };
+};
 
 export const useGameStore = create<GameState>((set, get) => ({
   ...createInitialState(),
@@ -181,33 +289,39 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (!meetsCondition(state.player, state.environment, card.condition)) {
       set((current) => ({
-        logs: [createLog(`【${card.name}】当前环境不满足使用条件。`), ...current.logs].slice(0, 8),
+        logs: [createLog(`【${card.name}】当前环境不满足使用条件。`), ...current.logs].slice(0, 10),
       }));
       return;
     }
 
     const applied = applyEffect(state.player, state.environment, card.effect);
+    const inventoryResult = addItemsToBackpack(state.backpack, card.effect.gainItems);
     const nextHandBase = state.hand.filter((item) => item.id !== card.id);
-    const nextHand = rotateDeck(
-      state.deck,
-      nextHandBase,
-      1 + (card.effect.drawCards ?? 0),
-    );
+    const nextHand = rotateDeck(state.deck, nextHandBase, 1 + (card.effect.drawCards ?? 0));
 
     const eventRoll = Math.random();
     const eventChance = 0.3 + (card.effect.eventChanceBonus ?? 0);
     const activeEvent = eventRoll < eventChance ? pickEvent(applied.player, applied.environment) : null;
+    const itemGainText =
+      card.effect.gainItems && card.effect.gainItems.length > 0
+        ? ` 获得：${card.effect.gainItems
+            .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
+            .join('、')}。`
+        : '';
+    const overflowText =
+      inventoryResult.overflow.length > 0 ? ` 背包已满，掉落：${inventoryResult.overflow.join('、')}。` : '';
 
     set((current) => ({
       player: applied.player,
       environment: applied.environment,
+      backpack: inventoryResult.backpack,
       hand: nextHand,
       activeEvent,
       logs: [
-        createLog(`你使用了【${card.name}】。${card.description}`),
+        createLog(`你使用了【${card.name}】。${card.description}${itemGainText}${overflowText}`),
         ...(activeEvent ? [createLog(`事件触发：${activeEvent.title}`)] : []),
         ...current.logs,
-      ].slice(0, 8),
+      ].slice(0, 10),
     }));
   },
 
@@ -221,17 +335,85 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const applied = applyEffect(state.player, state.environment, option.effect);
+    const inventoryResult = addItemsToBackpack(state.backpack, option.effect.gainItems);
     const nextHand = rotateDeck(state.deck, state.hand, option.effect.drawCards ?? 0);
 
     set((current) => ({
       player: applied.player,
       environment: applied.environment,
+      backpack: inventoryResult.backpack,
       hand: nextHand,
       activeEvent: null,
       logs: [
         createLog(`【${event.title}】${option.resultText}`),
         ...current.logs,
-      ].slice(0, 8),
+      ].slice(0, 10),
+    }));
+  },
+
+  selectBackpackSlot: (slotIndex) => {
+    set((state) => ({
+      selectedBackpackSlot: state.selectedBackpackSlot === slotIndex ? null : slotIndex,
+    }));
+  },
+
+  moveSelectedToSlot: (slotIndex) => {
+    const state = get();
+    const selected = state.selectedBackpackSlot;
+
+    if (selected === null || selected === slotIndex) {
+      return;
+    }
+
+    set((current) => ({
+      backpack: swapBackpackSlots(current.backpack, selected, slotIndex),
+      selectedBackpackSlot: slotIndex,
+      logs: [createLog(`你重新整理了背包中的物品位置。`), ...current.logs].slice(0, 10),
+    }));
+  },
+
+  useBackpackItem: (slotIndex) => {
+    const state = get();
+    const slot = state.backpack[slotIndex];
+    if (!slot || slot.itemId === null) {
+      return;
+    }
+
+    const item = itemById.get(slot.itemId);
+    if (!item?.effect) {
+      set((current) => ({
+        logs: [createLog(`【${item?.name ?? '未知物品'}】当前只能摆放或丢弃。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+
+    const applied = applyEffect(state.player, state.environment, item.effect);
+    const inventoryResult = addItemsToBackpack(consumeOneFromSlot(state.backpack, slotIndex), item.effect.gainItems);
+
+    set((current) => ({
+      player: applied.player,
+      environment: applied.environment,
+      backpack: inventoryResult.backpack,
+      selectedBackpackSlot: current.selectedBackpackSlot === slotIndex ? null : current.selectedBackpackSlot,
+      logs: [createLog(`你使用了背包物品【${item.name}】。`), ...current.logs].slice(0, 10),
+    }));
+  },
+
+  discardBackpackItem: (slotIndex) => {
+    const state = get();
+    const slot = state.backpack[slotIndex];
+    if (!slot || slot.itemId === null) {
+      return;
+    }
+
+    const item = itemById.get(slot.itemId);
+    const nextBackpack = cloneBackpack(state.backpack);
+    nextBackpack[slotIndex] = { slotIndex, itemId: null, amount: 0 };
+
+    set((current) => ({
+      backpack: nextBackpack,
+      selectedBackpackSlot: current.selectedBackpackSlot === slotIndex ? null : current.selectedBackpackSlot,
+      logs: [createLog(`你丢弃了【${item?.name ?? '未知物品'}】。`), ...current.logs].slice(0, 10),
     }));
   },
 
@@ -260,11 +442,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       environment: nextEnvironment,
       activeEvent: null,
       logs: [
-        createLog(
-          `进入第 ${nextEnvironment.day} 天 ${nextEnvironment.timeOfDay === 'day' ? '白天' : '夜晚'}，天气：${weatherLabel[nextEnvironment.weather]}`,
-        ),
+        createLog(`进入第 ${nextEnvironment.day} 天 ${nextEnvironment.timeOfDay === 'day' ? '白天' : '夜晚'}，天气：${weatherLabel[nextEnvironment.weather]}`),
         ...current.logs,
-      ].slice(0, 8),
+      ].slice(0, 10),
     }));
   },
 
@@ -288,4 +468,11 @@ export const terrainLabel = {
 export const timeLabel = {
   day: '白天',
   night: '夜晚',
+};
+
+export const getItemDefinition = (itemId: string | null): ItemDefinition | null => {
+  if (!itemId) {
+    return null;
+  }
+  return itemById.get(itemId) ?? null;
 };

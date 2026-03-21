@@ -1,4 +1,4 @@
-export type StatKey =
+﻿export type StatKey =
   | 'health'
   | 'hunger'
   | 'thirst'
@@ -7,6 +7,7 @@ export type StatKey =
   | 'fatigue';
 
 export type CardType = 'resource' | 'action' | 'event' | 'tool';
+export type ItemType = 'food' | 'water' | 'material' | 'tool' | 'medical';
 
 export type Weather = 'sunny' | 'rain' | 'storm';
 export type TimeOfDay = 'day' | 'night';
@@ -29,6 +30,11 @@ export interface EnvironmentState {
   turn: number;
 }
 
+export interface ItemStackChange {
+  itemId: string;
+  amount: number;
+}
+
 export interface CardEffect {
   statChanges?: Partial<Record<StatKey, number>>;
   moveTerrain?: Terrain;
@@ -36,6 +42,7 @@ export interface CardEffect {
   rest?: boolean;
   drawCards?: number;
   eventChanceBonus?: number;
+  gainItems?: ItemStackChange[];
 }
 
 export interface CardCondition {
@@ -52,6 +59,22 @@ export interface CardDefinition {
   description: string;
   effect: CardEffect;
   condition?: CardCondition;
+}
+
+export interface ItemDefinition {
+  id: string;
+  name: string;
+  type: ItemType;
+  icon: string;
+  description: string;
+  effect?: CardEffect;
+  maxStack: number;
+}
+
+export interface BackpackSlot {
+  slotIndex: number;
+  itemId: string | null;
+  amount: number;
 }
 
 export interface EventOption {

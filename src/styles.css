@@ -24,7 +24,7 @@ button {
   color: #152531;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.18s ease, opacity 0.18s ease;
+  transition: transform 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
 }
 
 button:hover {
@@ -166,11 +166,7 @@ button:disabled {
   position: absolute;
   inset: -10px;
   border-radius: 50%;
-  background: repeating-conic-gradient(
-    from 0deg,
-    #f0cd6b 0deg 12deg,
-    #caa045 12deg 24deg
-  );
+  background: repeating-conic-gradient(from 0deg, #f0cd6b 0deg 12deg, #caa045 12deg 24deg);
   clip-path: polygon(
     50% 0%, 58% 8%, 68% 4%, 73% 13%, 84% 12%, 85% 23%, 96% 27%, 92% 37%, 100% 45%,
     92% 54%, 96% 66%, 86% 70%, 85% 82%, 73% 82%, 68% 92%, 57% 88%, 50% 100%, 43% 88%,
@@ -283,9 +279,7 @@ button:disabled {
   border-radius: 50%;
   padding: 6px;
   background: conic-gradient(var(--emblem-tone) var(--emblem-fill), #3b342f 0);
-  box-shadow:
-    inset 0 0 0 6px #4e3622,
-    0 10px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 0 0 6px #4e3622, 0 10px 24px rgba(0, 0, 0, 0.24);
 }
 
 .status-emblem.compact .status-ring {
@@ -360,6 +354,131 @@ button:disabled {
   line-height: 1.6;
 }
 
+.backpack-panel {
+  overflow: hidden;
+}
+
+.backpack-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
+  gap: 20px;
+}
+
+.backpack-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.backpack-slot {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(48, 38, 29, 0.92), rgba(27, 22, 18, 0.92));
+  border: 1px solid rgba(212, 176, 84, 0.18);
+  display: grid;
+  place-items: center;
+}
+
+.backpack-slot.selected {
+  border-color: #e7bc6d;
+  box-shadow: 0 0 0 2px rgba(231, 188, 109, 0.25);
+}
+
+.backpack-slot.filled {
+  background: radial-gradient(circle at top, rgba(231, 188, 109, 0.12), transparent 60%), linear-gradient(180deg, rgba(57, 44, 34, 0.96), rgba(26, 20, 16, 0.96));
+}
+
+.slot-index {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  font-size: 0.72rem;
+  color: #8f8067;
+}
+
+.slot-icon {
+  font-size: 2rem;
+}
+
+.slot-amount {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 0.82rem;
+  color: #f0d490;
+}
+
+.slot-empty {
+  font-size: 0.82rem;
+  color: #6e665e;
+}
+
+.inventory-detail {
+  display: grid;
+}
+
+.inventory-card {
+  min-height: 100%;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.inventory-card h3,
+.event-panel h2 {
+  margin: 0;
+}
+
+.inventory-card p {
+  margin: 0;
+  color: #d8dee3;
+  line-height: 1.6;
+}
+
+.inventory-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  background: rgba(231, 188, 109, 0.12);
+  border: 1px solid rgba(231, 188, 109, 0.16);
+}
+
+.inventory-icon.empty {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.inventory-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inventory-meta span {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d8c49c;
+  font-size: 0.85rem;
+}
+
+.inventory-actions,
+.event-options,
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .card-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -378,18 +497,6 @@ button:disabled {
   display: block;
 }
 
-.event-panel h2 {
-  margin-top: 0;
-  margin-bottom: 0.4rem;
-}
-
-.event-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 14px;
-}
-
 .log-list {
   display: grid;
   gap: 10px;
@@ -405,14 +512,10 @@ button:disabled {
 @media (max-width: 980px) {
   .hero-panel,
   .dashboard,
-  .hud-layout {
+  .hud-layout,
+  .backpack-layout {
     grid-template-columns: 1fr;
     display: grid;
-  }
-
-  .hero-actions,
-  .world-markers {
-    flex-wrap: wrap;
   }
 
   .hud-primary-group,
@@ -451,5 +554,9 @@ button:disabled {
 
   .day-wheel-label {
     font-size: 1.6rem;
+  }
+
+  .backpack-grid {
+    gap: 10px;
   }
 }

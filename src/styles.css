@@ -44,11 +44,14 @@ button:disabled {
 }
 
 .app-shell {
-  max-width: 1280px;
+  max-width: 1500px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 14px;
+  height: 100vh;
   display: grid;
-  gap: 20px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
 }
 
 .hero-panel,
@@ -67,10 +70,18 @@ button:disabled {
   gap: 16px;
 }
 
+.hero-panel.compact {
+  padding: 14px 18px;
+}
+
 .hero-panel h1 {
   margin: 0.4rem 0;
   font-size: clamp(2rem, 4vw, 3.5rem);
   line-height: 1.05;
+}
+
+.hero-panel.compact h1 {
+  font-size: clamp(1.2rem, 2vw, 1.8rem);
 }
 
 .eyebrow {
@@ -94,14 +105,42 @@ button:disabled {
   gap: 12px;
 }
 
-.dashboard {
+.dashboard,
+.workbench-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 20px;
+  gap: 12px;
+}
+
+.workbench-grid {
+  grid-template-columns: minmax(260px, 0.8fr) minmax(480px, 1.35fr) minmax(320px, 1fr);
+  min-height: 0;
+}
+
+.left-column,
+.center-column,
+.right-column {
+  min-height: 0;
+}
+
+.left-column {
+  display: grid;
+  gap: 12px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.right-column {
+  display: grid;
+  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.panel-scroll {
+  overflow: auto;
 }
 
 .panel {
-  padding: 20px;
+  padding: 14px;
+  min-height: 0;
 }
 
 .panel-title {
@@ -118,18 +157,23 @@ button:disabled {
 
 .hud-layout {
   display: grid;
-  grid-template-columns: 1fr 220px 1fr;
+  grid-template-columns: 1fr 196px;
   align-items: center;
-  gap: 18px;
-  min-height: 280px;
-  padding: 6px 0 10px;
+  gap: 12px;
+  min-height: 0;
+  padding: 4px 0;
 }
 
 .hud-primary-group,
 .hud-secondary-group {
   display: grid;
-  gap: 18px;
+  gap: 10px;
   justify-items: center;
+}
+
+.hud-secondary-group.horizontal {
+  margin-top: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .day-wheel-wrap {
@@ -140,8 +184,8 @@ button:disabled {
 
 .day-wheel {
   position: relative;
-  width: 188px;
-  height: 188px;
+  width: 150px;
+  height: 150px;
   border-radius: 50%;
   padding: 14px;
   background:
@@ -179,7 +223,7 @@ button:disabled {
 
 .day-wheel-inner {
   position: absolute;
-  inset: 36px;
+  inset: 28px;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 35%, #836330 0%, #3e2e1b 100%);
   display: grid;
@@ -190,7 +234,7 @@ button:disabled {
 }
 
 .day-wheel-label {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: #fff1c2;
   line-height: 1;
@@ -262,20 +306,20 @@ button:disabled {
 
 .status-emblem {
   display: grid;
-  grid-template-columns: 94px auto;
+  grid-template-columns: 74px auto;
   align-items: center;
   gap: 14px;
   width: min(100%, 230px);
 }
 
 .status-emblem.compact {
-  grid-template-columns: 82px auto;
+  grid-template-columns: 62px auto;
 }
 
 .status-ring {
   position: relative;
-  width: 94px;
-  height: 94px;
+  width: 74px;
+  height: 74px;
   border-radius: 50%;
   padding: 6px;
   background: conic-gradient(var(--emblem-tone) var(--emblem-fill), #3b342f 0);
@@ -283,8 +327,8 @@ button:disabled {
 }
 
 .status-emblem.compact .status-ring {
-  width: 82px;
-  height: 82px;
+  width: 62px;
+  height: 62px;
 }
 
 .status-core {
@@ -298,13 +342,13 @@ button:disabled {
 }
 
 .status-icon {
-  font-size: 2rem;
+  font-size: 1.6rem;
   line-height: 1;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
 
 .status-emblem.compact .status-icon {
-  font-size: 1.8rem;
+  font-size: 1.3rem;
 }
 
 .status-meta {
@@ -313,7 +357,7 @@ button:disabled {
 }
 
 .status-meta strong {
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   line-height: 1;
   color: #fff2c9;
 }
@@ -361,13 +405,17 @@ button:disabled {
 .backpack-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
-  gap: 20px;
+  gap: 12px;
+}
+
+.backpack-layout.single-screen {
+  height: 100%;
 }
 
 .backpack-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
 }
 
 .backpack-slot {
@@ -417,6 +465,8 @@ button:disabled {
 
 .inventory-detail {
   display: grid;
+  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .inventory-card {
@@ -427,7 +477,7 @@ button:disabled {
   border: 1px solid rgba(255, 255, 255, 0.06);
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .inventory-card h3,
@@ -442,8 +492,8 @@ button:disabled {
 }
 
 .inventory-icon {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: 20px;
   display: grid;
   place-items: center;
@@ -480,9 +530,12 @@ button:disabled {
 }
 
 .crafting-panel {
-  margin-top: 20px;
-  padding-top: 16px;
+ codex/add-crafting-system-to-backpack-fa5sqf
+  margin-top: 0;
+  padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 0;
+
 }
 
 .crafting-panel h3 {
@@ -490,17 +543,21 @@ button:disabled {
 }
 
 .crafting-note {
-  margin: 8px 0 12px;
+codex/add-crafting-system-to-backpack-fa5sqf
+  margin: 6px 0 10px;
+
   color: #cfd8de;
 }
 
 .crafting-list {
   display: grid;
-  gap: 10px;
+codex/add-crafting-system-to-backpack-fa5sqf
+  gap: 8px;
 }
 
 .crafting-item {
-  padding: 12px 14px;
+  padding: 10px;
+
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -534,6 +591,16 @@ button:disabled {
   gap: 16px;
 }
 
+.card-row.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hand-panel .card-button {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
 .card-button {
   width: 100%;
   padding: 0;
@@ -548,11 +615,11 @@ button:disabled {
 
 .log-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .log-item {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   color: #d8dee3;
@@ -561,10 +628,19 @@ button:disabled {
 @media (max-width: 980px) {
   .hero-panel,
   .dashboard,
+  .workbench-grid,
   .hud-layout,
-  .backpack-layout {
+  .backpack-layout,
+  .left-column,
+  .right-column {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .app-shell {
+    height: auto;
+    overflow: visible;
+    grid-template-rows: auto;
   }
 
   .hud-primary-group,
@@ -592,10 +668,7 @@ button:disabled {
     height: 78px;
   }
 
-  .day-wheel {
-    width: 160px;
-    height: 160px;
-  }
+  .day-wheel { width: 160px; height: 160px; }
 
   .day-wheel-inner {
     inset: 30px;

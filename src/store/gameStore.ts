@@ -7,6 +7,7 @@ import type {
   CardCondition,
   CardDefinition,
   CardEffect,
+  CraftingRecipe,
   EnvironmentState,
   EventDefinition,
   ItemDefinition,
@@ -31,6 +32,7 @@ interface GameState {
   moveSelectedToSlot: (slotIndex: number) => void;
   useBackpackItem: (slotIndex: number) => void;
   discardBackpackItem: (slotIndex: number) => void;
+  craftRecipe: (recipeId: string) => void;
   nextTurn: () => void;
   resetGame: () => void;
 }
@@ -258,6 +260,79 @@ const swapBackpackSlots = (backpack: BackpackSlot[], fromIndex: number, toIndex:
   return nextBackpack;
 };
 
+const craftingRecipes: CraftingRecipe[] = [
+  {
+    id: 'fiber-rope',
+    name: '编制纤维绳',
+    description: '把棕榈纤维搓成更牢固的绳索，便于后续制作工具。',
+    requires: [{ itemId: 'palm-fiber', amount: 2 }],
+    produces: [{ itemId: 'campfire-kit', amount: 1 }],
+  },
+  {
+    id: 'field-medicine',
+    name: '应急草药包',
+    description: '用浆果和纤维打包成简易治疗包。',
+    requires: [
+      { itemId: 'berries', amount: 2 },
+      { itemId: 'palm-fiber', amount: 1 },
+    ],
+    produces: [{ itemId: 'herb-bundle', amount: 1 }],
+  },
+  {
+    id: 'fire-starter-pack',
+    name: '野外引火包',
+    description: '拆分木矛与纤维做成多份引火材料，便于夜间续火。',
+    requires: [
+      { itemId: 'spear', amount: 1 },
+      { itemId: 'palm-fiber', amount: 2 },
+    ],
+    produces: [{ itemId: 'campfire-kit', amount: 2 }],
+  },
+];
+
+const countBackpackItems = (backpack: BackpackSlot[]) => {
+  const counts = new Map<string, number>();
+
+  backpack.forEach((slot) => {
+    if (!slot.itemId || slot.amount <= 0) {
+      return;
+    }
+    counts.set(slot.itemId, (counts.get(slot.itemId) ?? 0) + slot.amount);
+  });
+
+  return counts;
+};
+
+const canCraftRecipeFromBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) => {
+  const itemCounts = countBackpackItems(backpack);
+  return recipe.requires.every((requirement) => (itemCounts.get(requirement.itemId) ?? 0) >= requirement.amount);
+};
+
+const consumeItemsFromBackpack = (backpack: BackpackSlot[], requirements: ItemStackChange[]) => {
+  const nextBackpack = cloneBackpack(backpack);
+
+  requirements.forEach(({ itemId, amount }) => {
+    let remaining = amount;
+
+    nextBackpack.forEach((slot) => {
+      if (remaining <= 0 || slot.itemId !== itemId) {
+        return;
+      }
+
+      const consumed = Math.min(slot.amount, remaining);
+      slot.amount -= consumed;
+      remaining -= consumed;
+
+      if (slot.amount <= 0) {
+        slot.itemId = null;
+        slot.amount = 0;
+      }
+    });
+  });
+
+  return nextBackpack;
+};
+
 const createInitialState = () => {
   const seeded = addItemsToBackpack(createInitialBackpack(), [
     { itemId: 'berries', amount: 1 },
@@ -417,6 +492,35 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
+  craftRecipe: (recipeId) => {
+    const state = get();
+    const recipe = craftingRecipes.find((entry) => entry.id === recipeId);
+
+    if (!recipe) {
+      return;
+    }
+
+    if (!canCraftRecipeFromBackpack(state.backpack, recipe)) {
+      set((current) => ({
+        logs: [createLog(`【${recipe.name}】材料不足，无法合成。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+
+    const consumedBackpack = consumeItemsFromBackpack(state.backpack, recipe.requires);
+    const craftedResult = addItemsToBackpack(consumedBackpack, recipe.produces);
+    const outputText = recipe.produces
+      .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
+      .join('、');
+    const overflowText =
+      craftedResult.overflow.length > 0 ? ` 背包空间不足，掉落：${craftedResult.overflow.join('、')}。` : '';
+
+    set((current) => ({
+      backpack: craftedResult.backpack,
+      logs: [createLog(`你在工作台合成了【${recipe.name}】：${outputText}。${overflowText}`), ...current.logs].slice(0, 10),
+    }));
+  },
+
   nextTurn: () => {
     const state = get();
     const nextTurn = state.environment.turn + 1;
@@ -476,3 +580,7 @@ export const getItemDefinition = (itemId: string | null): ItemDefinition | null 
   }
   return itemById.get(itemId) ?? null;
 };
+
+export const allCraftingRecipes = craftingRecipes;
+export const canCraftInBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) =>
+  canCraftRecipeFromBackpack(backpack, recipe);

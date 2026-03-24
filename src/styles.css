@@ -479,6 +479,55 @@ button:disabled {
   gap: 12px;
 }
 
+.crafting-panel {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.crafting-panel h3 {
+  margin: 0;
+}
+
+.crafting-note {
+  margin: 8px 0 12px;
+  color: #cfd8de;
+}
+
+.crafting-list {
+  display: grid;
+  gap: 10px;
+}
+
+.crafting-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.crafting-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.crafting-item p {
+  margin: 0;
+  color: #d2dbe0;
+}
+
+.crafting-meta {
+  margin-top: 8px;
+  display: grid;
+  gap: 4px;
+  color: #e2c897;
+  font-size: 0.85rem;
+}
+
 .card-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -558,5 +607,10 @@ button:disabled {
 
   .backpack-grid {
     gap: 10px;
+  }
+
+  .crafting-item {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

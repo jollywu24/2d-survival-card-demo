@@ -243,7 +243,9 @@ function App() {
               </div>
             </div>
           </div>
+ codex/add-crafting-system-to-backpack-fa5sqf
         </section>
+
 
         <section className="right-column">
           {activeEvent && (

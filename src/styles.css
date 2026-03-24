@@ -530,10 +530,12 @@ button:disabled {
 }
 
 .crafting-panel {
+ codex/add-crafting-system-to-backpack-fa5sqf
   margin-top: 0;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   min-height: 0;
+
 }
 
 .crafting-panel h3 {
@@ -541,17 +543,21 @@ button:disabled {
 }
 
 .crafting-note {
+codex/add-crafting-system-to-backpack-fa5sqf
   margin: 6px 0 10px;
+
   color: #cfd8de;
 }
 
 .crafting-list {
   display: grid;
+codex/add-crafting-system-to-backpack-fa5sqf
   gap: 8px;
 }
 
 .crafting-item {
   padding: 10px;
+
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);

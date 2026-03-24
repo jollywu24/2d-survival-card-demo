@@ -35,6 +35,14 @@ export interface ItemStackChange {
   amount: number;
 }
 
+export interface CraftingRecipe {
+  id: string;
+  name: string;
+  description: string;
+  requires: ItemStackChange[];
+  produces: ItemStackChange[];
+}
+
 export interface CardEffect {
   statChanges?: Partial<Record<StatKey, number>>;
   moveTerrain?: Terrain;

@@ -1,6 +1,8 @@
 ﻿import type { CSSProperties } from 'react';
 import { CardCanvas } from './components/CardCanvas';
 import {
+  allCraftingRecipes,
+  canCraftInBackpack,
   getItemDefinition,
   meetsCondition,
   terrainLabel,
@@ -41,6 +43,7 @@ function App() {
     moveSelectedToSlot,
     useBackpackItem,
     discardBackpackItem,
+    craftRecipe,
     useCard,
   } = useGameStore();
 
@@ -205,6 +208,47 @@ function App() {
                 </>
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="crafting-panel">
+          <h3>工作台合成</h3>
+          <p className="crafting-note">配方会直接消耗背包材料并把结果放回背包。</p>
+          <div className="crafting-list">
+            {allCraftingRecipes.map((recipe) => {
+              const canCraft = canCraftInBackpack(backpack, recipe);
+              return (
+                <div key={recipe.id} className="crafting-item">
+                  <div>
+                    <strong>{recipe.name}</strong>
+                    <p>{recipe.description}</p>
+                    <div className="crafting-meta">
+                      <span>
+                        材料：
+                        {recipe.requires
+                          .map(
+                            (entry) =>
+                              `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`,
+                          )
+                          .join(' + ')}
+                      </span>
+                      <span>
+                        产出：
+                        {recipe.produces
+                          .map(
+                            (entry) =>
+                              `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`,
+                          )
+                          .join(' + ')}
+                      </span>
+                    </div>
+                  </div>
+                  <button type="button" disabled={!canCraft} onClick={() => craftRecipe(recipe.id)}>
+                    {canCraft ? '合成' : '材料不足'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

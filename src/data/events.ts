@@ -36,7 +36,7 @@ export const randomEvents: EventDefinition[] = [
     title: '夜里的异响',
     description: '黑暗里传来不明动物的叫声，让人神经紧绷。',
     condition: {
-      allowedTime: ['night'],
+      allowedTime: ['dusk', 'night'],
     },
     options: [
       {

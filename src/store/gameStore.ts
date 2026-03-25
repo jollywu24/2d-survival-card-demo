@@ -47,6 +47,7 @@ const MIN_STAT = 0;
 const HAND_SIZE = 4;
 const BACKPACK_SIZE = 16;
 const TOTAL_DAYS = 7;
+const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
 
 const itemById = new Map(itemCatalog.map((item) => [item.id, item]));
 
@@ -523,6 +524,49 @@ const createEnding = (
   };
 };
 
+const getNextPhase = (current: EnvironmentState['timeOfDay']) => {
+  const index = PHASE_ORDER.indexOf(current);
+  return PHASE_ORDER[(index + 1) % PHASE_ORDER.length];
+};
+
+const isStartOfNewDay = (current: EnvironmentState['timeOfDay'], next: EnvironmentState['timeOfDay']) =>
+  current === 'night' && next === 'day';
+
+const getPhaseStatDecay = (
+  phase: EnvironmentState['timeOfDay'],
+  weather: EnvironmentState['weather'],
+): Partial<Record<StatKey, number>> => {
+  const weatherTemperaturePenalty =
+    weather === 'storm' ? -8 : weather === 'rain' ? -4 : 0;
+
+  if (phase === 'day') {
+    return {
+      hunger: -5,
+      thirst: -6,
+      fatigue: -3,
+      temperature: weatherTemperaturePenalty,
+    };
+  }
+
+  if (phase === 'dusk') {
+    return {
+      hunger: -3,
+      thirst: -4,
+      fatigue: -4,
+      temperature: weatherTemperaturePenalty - 2,
+      sanity: -2,
+    };
+  }
+
+  return {
+    hunger: -4,
+    thirst: -5,
+    fatigue: -6,
+    temperature: weatherTemperaturePenalty - 4,
+    sanity: -4,
+  };
+};
+
 export const useGameStore = create<GameState>((set, get) => ({
   ...createInitialState(),
 
@@ -741,42 +785,44 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const nextTurn = state.environment.turn + 1;
-    const isNight = nextTurn % 2 === 0;
+    const nextPhase = getNextPhase(state.environment.timeOfDay);
+    const startOfNewDay = isStartOfNewDay(state.environment.timeOfDay, nextPhase);
     const nextEnvironment: EnvironmentState = {
       ...state.environment,
       turn: nextTurn,
-      timeOfDay: isNight ? 'night' : 'day',
-      day: state.environment.day + (isNight ? 0 : 1),
+      timeOfDay: nextPhase,
+      day: state.environment.day + (startOfNewDay ? 1 : 0),
       weather: ['sunny', 'rain', 'storm'][Math.floor(Math.random() * 3)] as EnvironmentState['weather'],
     };
 
-    const nextPlayer = applyStatChanges(state.player, {
-      hunger: -8,
-      thirst: -10,
-      fatigue: isNight ? -6 : -3,
-      temperature: nextEnvironment.weather === 'storm' ? -8 : nextEnvironment.weather === 'rain' ? -4 : 0,
-      sanity: isNight ? -4 : 0,
-    });
+    const nextPlayer = applyStatChanges(
+      state.player,
+      getPhaseStatDecay(nextPhase, nextEnvironment.weather),
+    );
 
     const progressAfterTurn: PrototypeProgress = {
       ...state.progress,
-      journal: isNight
+      journal: state.environment.timeOfDay === 'night'
         ? appendJournalEntry(state.progress.journal, state.environment.day, nextPlayer, state.progress)
         : state.progress.journal,
     };
 
     const shouldEndByDeath = nextPlayer.health <= 0;
     const shouldResolveSevenDayRun =
-      state.environment.day === TOTAL_DAYS && state.environment.timeOfDay === 'night' && !isNight;
+      state.environment.day === TOTAL_DAYS &&
+      state.environment.timeOfDay === 'night' &&
+      nextPhase === 'day';
     const ending = shouldEndByDeath
       ? createEnding('dead', progressAfterTurn)
       : shouldResolveSevenDayRun
         ? createEnding(progressAfterTurn.beaconCrafted ? 'rescued' : 'survived', progressAfterTurn)
         : null;
 
-    const currentGoal = prototypeGoals.find((goal) => goal.day === Math.min(state.environment.day, TOTAL_DAYS));
+    const currentGoal = prototypeGoals.find(
+      (goal) => goal.day === Math.min(state.environment.day, TOTAL_DAYS),
+    );
     const goalLog =
-      !isNight && currentGoal
+      startOfNewDay && currentGoal
         ? [
             createLog(
               getGoalCompletion(currentGoal.id, nextPlayer, progressAfterTurn)
@@ -793,7 +839,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       activeEvent: null,
       ending,
       logs: [
-        createLog(`进入第 ${nextEnvironment.day} 天 ${nextEnvironment.timeOfDay === 'day' ? '白天' : '夜晚'}，天气：${weatherLabel[nextEnvironment.weather]}`),
+        createLog(
+          `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}`,
+        ),
         ...goalLog,
         ...(ending ? [createLog(`结局：${ending.title}`)] : []),
         ...current.logs,
@@ -820,6 +868,7 @@ export const terrainLabel = {
 
 export const timeLabel = {
   day: '白天',
+  dusk: '黄昏',
   night: '夜晚',
 };
 

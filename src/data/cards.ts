@@ -51,7 +51,7 @@ export const starterDeck: CardDefinition[] = [
       statChanges: { temperature: 16, sanity: 6, fatigue: -4 },
     },
     condition: {
-      allowedTime: ['night'],
+      allowedTime: ['dusk', 'night'],
     },
   },
   {
@@ -103,6 +103,9 @@ export const starterDeck: CardDefinition[] = [
     effect: {
       statChanges: { fatigue: 18, sanity: 6, hunger: -4, thirst: -4 },
       rest: true,
+    },
+    condition: {
+      allowedTime: ['dusk', 'night'],
     },
   },
   {

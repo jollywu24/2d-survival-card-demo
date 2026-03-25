@@ -10,7 +10,7 @@ export type CardType = 'resource' | 'action' | 'event' | 'tool';
 export type ItemType = 'food' | 'water' | 'material' | 'tool' | 'medical';
 
 export type Weather = 'sunny' | 'rain' | 'storm';
-export type TimeOfDay = 'day' | 'night';
+export type TimeOfDay = 'day' | 'dusk' | 'night';
 export type Terrain = 'beach' | 'jungle' | 'cave';
 
 export interface PlayerState {

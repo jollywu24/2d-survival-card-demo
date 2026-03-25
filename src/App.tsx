@@ -82,7 +82,7 @@ function App() {
         </div>
         <div className="hero-actions">
           <button type="button" onClick={nextTurn}>
-            推进回合
+            推进阶段
           </button>
           <button type="button" className="secondary" onClick={resetGame}>
             重开
@@ -147,7 +147,9 @@ function App() {
                 <strong>
                   Day {Math.min(environment.day, progress.totalDays)} / {progress.totalDays}
                 </strong>
-                <span>{completedGoalCount} / {allPrototypeGoals.length} 目标完成</span>
+                <span>
+                  {timeLabel[environment.timeOfDay]} · {completedGoalCount} / {allPrototypeGoals.length} 目标完成
+                </span>
               </div>
               <div className="prototype-progress-bar">
                 <div style={{ width: `${(completedGoalCount / allPrototypeGoals.length) * 100}%` }} />

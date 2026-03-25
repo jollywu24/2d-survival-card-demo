@@ -8,10 +8,19 @@ interface CardCanvasProps {
 }
 
 const typeColor = {
-  resource: '#5bbf8a',
   action: '#f4b860',
-  event: '#7ec8e3',
-  tool: '#d98ef2',
+  resource: '#6aaa5f',
+  recipe: '#4d82d9',
+  event: '#c55a4e',
+  skill: '#cba14a',
+};
+
+const typeLabel = {
+  action: '行动卡',
+  resource: '资源卡',
+  recipe: '配方卡',
+  event: '事件卡',
+  skill: '技能卡',
 };
 
 export function CardCanvas({ card, disabled = false, onClick }: CardCanvasProps) {
@@ -38,7 +47,7 @@ export function CardCanvas({ card, disabled = false, onClick }: CardCanvasProps)
 
     context.fillStyle = typeColor[card.type];
     context.font = 'bold 14px sans-serif';
-    context.fillText(card.type.toUpperCase(), 18, 30);
+    context.fillText(typeLabel[card.type], 18, 30);
 
     context.fillStyle = '#f6f2e9';
     context.font = 'bold 20px sans-serif';

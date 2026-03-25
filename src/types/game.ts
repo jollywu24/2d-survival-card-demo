@@ -6,7 +6,7 @@
   | 'sanity'
   | 'fatigue';
 
-export type CardType = 'resource' | 'action' | 'event' | 'tool';
+export type CardType = 'action' | 'resource' | 'recipe' | 'event' | 'skill';
 export type ItemType = 'food' | 'water' | 'material' | 'tool' | 'medical';
 
 export type Weather = 'sunny' | 'rain' | 'storm';
@@ -103,6 +103,26 @@ export interface CardDefinition {
   actionCost?: number;
   effect: CardEffect;
   condition?: CardCondition;
+}
+
+export interface PrototypeCardSpec {
+  id: string;
+  name: string;
+  type: CardType;
+  actionCost: number;
+  usageWindow: string;
+  terrainFocus: string;
+  functionBoundary: string;
+  output: string;
+  implementationStatus: 'implemented' | 'planned';
+}
+
+export interface PrototypeCardGroupSpec {
+  type: CardType;
+  label: string;
+  targetCount: number;
+  designBoundary: string;
+  cards: PrototypeCardSpec[];
 }
 
 export interface ItemDefinition {

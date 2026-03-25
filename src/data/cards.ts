@@ -4,7 +4,7 @@ export const starterDeck: CardDefinition[] = [
   {
     id: 'gather-berries',
     name: '采集浆果',
-    type: 'resource',
+    type: 'action',
     actionCost: 1,
     description: '在附近搜寻可食用浆果，补充食物并带回一些存货。',
     effect: {
@@ -19,7 +19,7 @@ export const starterDeck: CardDefinition[] = [
   {
     id: 'collect-rainwater',
     name: '收集淡水',
-    type: 'resource',
+    type: 'action',
     actionCost: 1,
     description: '利用叶片和容器收集雨水，为背包补充可饮用的淡水。',
     effect: {
@@ -49,7 +49,7 @@ export const starterDeck: CardDefinition[] = [
   {
     id: 'light-fire',
     name: '生火取暖',
-    type: 'tool',
+    type: 'action',
     actionCost: 1,
     description: '保持体温并稳定精神，夜晚尤其有用。',
     effect: {
@@ -62,7 +62,7 @@ export const starterDeck: CardDefinition[] = [
   {
     id: 'build-shelter',
     name: '搭建庇护所',
-    type: 'tool',
+    type: 'recipe',
     actionCost: 2,
     description: '临时庇护所让你更安全，也会留下些可重复利用的材料。',
     effect: {
@@ -121,7 +121,7 @@ export const starterDeck: CardDefinition[] = [
   {
     id: 'observe-sky',
     name: '观察天色',
-    type: 'event',
+    type: 'skill',
     actionCost: 1,
     description: '留意云层和海风，提升对环境的把握。',
     effect: {
@@ -135,7 +135,7 @@ export const starterDeck: CardDefinition[] = [
   {
     id: 'craft-spear',
     name: '制作木矛',
-    type: 'tool',
+    type: 'recipe',
     actionCost: 2,
     description: '简单工具能让后续生存更容易，并会进入你的背包。',
     effect: {

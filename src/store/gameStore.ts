@@ -1,6 +1,6 @@
 ﻿import { create } from 'zustand';
 import { starterDeck } from '../data/cards';
-import { randomEvents } from '../data/events';
+import { randomEvents, scriptedEvents } from '../data/events';
 import { itemCatalog } from '../data/items';
 import type {
   BackpackSlot,
@@ -53,6 +53,7 @@ const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
   dusk: 1,
   night: 1,
 };
+const scriptedEventById = new Map(scriptedEvents.map((event) => [event.id, event]));
 
 const itemById = new Map(itemCatalog.map((item) => [item.id, item]));
 
@@ -83,6 +84,8 @@ const initialProgress = (): PrototypeProgress => ({
   campfireCrafted: false,
   spearCrafted: false,
   beaconCrafted: false,
+  lastActionSummary: '你刚刚从海水里爬上岸，还没有真正开始求生。',
+  resolvedCrises: [],
   journal: [],
 });
 
@@ -437,12 +440,14 @@ const createInitialState = () => {
 const updateProgressFromAction = (
   progress: PrototypeProgress,
   cardId: string,
+  actionSummary: string,
   gains: ItemStackChange[] = [],
 ) => ({
   ...progress,
   shelterBuilt: progress.shelterBuilt || cardId === 'build-shelter',
   jungleExplored: progress.jungleExplored || cardId === 'explore-jungle',
   caveExplored: progress.caveExplored || cardId === 'enter-cave',
+  lastActionSummary: actionSummary,
   spearCrafted:
     progress.spearCrafted ||
     cardId === 'craft-spear' ||
@@ -455,6 +460,21 @@ const appendJournalEntry = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => {
+  const lowestStat = (
+    Object.entries(player) as [StatKey, number][]
+  ).sort((a, b) => a[1] - b[1])[0]?.[0];
+
+  const lowStatLine =
+    lowestStat === 'hunger'
+      ? '胃里空得发紧，我知道明天一早必须先找吃的。'
+      : lowestStat === 'thirst'
+        ? '喉咙一直在发干，水的问题已经不能再拖。'
+        : lowestStat === 'temperature'
+          ? '一到风起的时候我就能感觉到寒意顺着背往里钻。'
+          : lowestStat === 'sanity'
+            ? '真正危险的不是眼前的岛，而是脑子里越来越吵的念头。'
+            : '身体并不轻松，但至少还没彻底垮掉。';
+
   const tone =
     player.health < 35 || player.thirst < 30
       ? '今天几乎被荒野拖垮，我清楚地感觉到身体在报警。'
@@ -468,10 +488,15 @@ const appendJournalEntry = (
       ? '庇护所勉强成形，至少风雨来时不再完全暴露。'
       : '我还在和最基础的生存问题搏斗。';
 
+  const crisisLine =
+    progress.resolvedCrises.length > 0
+      ? `今天最难忘的是${progress.resolvedCrises[0]}，我现在还能想起那一下心脏发紧的感觉。`
+      : '今天没有彻底失控，这已经算是运气。';
+
   return [
     {
       day,
-      text: `第 ${day} 天夜里。${tone}${milestone}`,
+      text: `第 ${day} 天夜里。${progress.lastActionSummary}${tone}${lowStatLine}${milestone}${crisisLine}`,
     },
     ...journal,
   ].slice(0, TOTAL_DAYS);
@@ -531,6 +556,32 @@ const createEnding = (
   };
 };
 
+const getScriptedEventIdForPhase = (day: number, phase: EnvironmentState['timeOfDay']) => {
+  if (day === 3 && phase === 'night') {
+    return 'storm-impact';
+  }
+  if (day === 5 && phase === 'night') {
+    return 'boar-raid';
+  }
+  if (day === 6 && (phase === 'day' || phase === 'dusk')) {
+    return 'dirty-water';
+  }
+  return null;
+};
+
+const getPhaseForeshadow = (day: number, phase: EnvironmentState['timeOfDay']) => {
+  if (day === 3 && phase === 'dusk') {
+    return '天边的云层压得很低，今晚恐怕不是普通的雨夜。';
+  }
+  if (day === 5 && phase === 'dusk') {
+    return '营地附近出现了翻动泥土的痕迹，像是有大型动物在徘徊。';
+  }
+  if (day === 6 && phase === 'day') {
+    return '你发现存下来的淡水味道不太对，也许水源正在变坏。';
+  }
+  return null;
+};
+
 const getNextPhase = (current: EnvironmentState['timeOfDay']) => {
   const index = PHASE_ORDER.indexOf(current);
   return PHASE_ORDER[(index + 1) % PHASE_ORDER.length];
@@ -582,6 +633,16 @@ const spendActions = (environment: EnvironmentState, cost: number): EnvironmentS
   actionsRemaining: Math.max(0, environment.actionsRemaining - cost),
 });
 
+const phaseSummaryLabel = (phase: EnvironmentState['timeOfDay']) => {
+  if (phase === 'day') {
+    return '白天';
+  }
+  if (phase === 'dusk') {
+    return '黄昏';
+  }
+  return '夜里';
+};
+
 export const useGameStore = create<GameState>((set, get) => ({
   ...createInitialState(),
 
@@ -623,7 +684,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const applied = applyEffect(state.player, state.environment, card.effect);
     const environmentAfterAction = spendActions(applied.environment, actionCost);
     const inventoryResult = addItemsToBackpack(state.backpack, card.effect.gainItems);
-    const nextProgress = updateProgressFromAction(state.progress, card.id, card.effect.gainItems);
+    const nextProgress = updateProgressFromAction(
+      state.progress,
+      card.id,
+      `${phaseSummaryLabel(state.environment.timeOfDay)}的主要精力花在了“${card.name}”上。`,
+      card.effect.gainItems,
+    );
     const nextHandBase = state.hand.filter((item) => item.id !== card.id);
     const nextHand = rotateDeck(state.deck, nextHandBase, 1 + (card.effect.drawCards ?? 0));
 
@@ -673,6 +739,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((current) => ({
       player: applied.player,
       environment: applied.environment,
+      progress: {
+        ...current.progress,
+        lastActionSummary: `我最终选择了“${option.label}”来应对${event.title}。`,
+        resolvedCrises: [event.title, ...current.progress.resolvedCrises].slice(0, 3),
+      },
       backpack: inventoryResult.backpack,
       hand: nextHand,
       activeEvent: null,
@@ -753,6 +824,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((current) => ({
       player: applied.player,
       environment: environmentAfterAction,
+      progress: {
+        ...current.progress,
+        lastActionSummary: `我从背包里拿出了${item.name}，希望这一步足够值得。`,
+      },
       backpack: inventoryResult.backpack,
       selectedBackpackSlot: current.selectedBackpackSlot === slotIndex ? null : current.selectedBackpackSlot,
       logs: [createLog(`你使用了背包物品【${item.name}】。`), ...current.logs].slice(0, 10),
@@ -830,6 +905,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       beaconCrafted:
         state.progress.beaconCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),
+      lastActionSummary: `我把零散材料拼成了“${recipe.name}”，营地终于多了一点像样的准备。`,
     };
 
     set((current) => ({
@@ -845,6 +921,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.ending) {
       return;
     }
+    if (state.activeEvent) {
+      set((current) => ({
+        logs: [createLog('当前危机还没有处理，今晚不能就这么糊弄过去。'), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
 
     if (state.player.health <= 0) {
       set({
@@ -856,11 +938,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextTurn = state.environment.turn + 1;
     const nextPhase = getNextPhase(state.environment.timeOfDay);
     const startOfNewDay = isStartOfNewDay(state.environment.timeOfDay, nextPhase);
+    const nextDay = state.environment.day + (startOfNewDay ? 1 : 0);
     const nextEnvironment: EnvironmentState = {
       ...state.environment,
       turn: nextTurn,
       timeOfDay: nextPhase,
-      day: state.environment.day + (startOfNewDay ? 1 : 0),
+      day: nextDay,
       weather: ['sunny', 'rain', 'storm'][Math.floor(Math.random() * 3)] as EnvironmentState['weather'],
       actionsRemaining: PHASE_ACTION_LIMIT[nextPhase],
       actionLimit: PHASE_ACTION_LIMIT[nextPhase],
@@ -877,6 +960,13 @@ export const useGameStore = create<GameState>((set, get) => ({
         ? appendJournalEntry(state.progress.journal, state.environment.day, nextPlayer, state.progress)
         : state.progress.journal,
     };
+
+    const foreshadowText = getPhaseForeshadow(nextDay, nextPhase);
+    const scriptedEventId = getScriptedEventIdForPhase(nextDay, nextPhase);
+    const scriptedEvent =
+      scriptedEventId && !progressAfterTurn.resolvedCrises.includes(scriptedEventById.get(scriptedEventId)?.title ?? '')
+        ? scriptedEventById.get(scriptedEventId) ?? null
+        : null;
 
     const shouldEndByDeath = nextPlayer.health <= 0;
     const shouldResolveSevenDayRun =
@@ -902,17 +992,23 @@ export const useGameStore = create<GameState>((set, get) => ({
             ),
           ]
         : [];
+    const scriptedEventLogs = scriptedEvent
+      ? [createLog(`危机爆发：${scriptedEvent.title}`)]
+      : [];
+    const foreshadowLogs = foreshadowText ? [createLog(`征兆：${foreshadowText}`)] : [];
 
     set((current) => ({
       player: nextPlayer,
       environment: nextEnvironment,
       progress: progressAfterTurn,
-      activeEvent: null,
+      activeEvent: ending ? null : scriptedEvent,
       ending,
       logs: [
         createLog(
           `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}，可行动 ${nextEnvironment.actionLimit} 次。`,
         ),
+        ...foreshadowLogs,
+        ...scriptedEventLogs,
         ...goalLog,
         ...(ending ? [createLog(`结局：${ending.title}`)] : []),
         ...current.logs,

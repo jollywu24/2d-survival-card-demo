@@ -14,6 +14,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 button {
@@ -25,6 +26,7 @@ button {
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
+  touch-action: manipulation;
 }
 
 button:hover {
@@ -60,6 +62,7 @@ button:disabled {
   border: 1px solid rgba(238, 220, 189, 0.12);
   border-radius: 24px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }
 
 .hero-panel {
@@ -100,8 +103,11 @@ button:disabled {
   line-height: 1.6;
 }
 
-.hero-actions {
+.hero-actions,
+.inventory-actions,
+.event-options {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -521,21 +527,11 @@ button:disabled {
   font-size: 0.85rem;
 }
 
-.inventory-actions,
-.event-options,
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
 .crafting-panel {
- codex/add-crafting-system-to-backpack-fa5sqf
   margin-top: 0;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   min-height: 0;
-
 }
 
 .crafting-panel h3 {
@@ -543,21 +539,17 @@ button:disabled {
 }
 
 .crafting-note {
-codex/add-crafting-system-to-backpack-fa5sqf
   margin: 6px 0 10px;
-
   color: #cfd8de;
 }
 
 .crafting-list {
   display: grid;
-codex/add-crafting-system-to-backpack-fa5sqf
   gap: 8px;
 }
 
 .crafting-item {
   padding: 10px;
-
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -639,8 +631,17 @@ codex/add-crafting-system-to-backpack-fa5sqf
 
   .app-shell {
     height: auto;
+    min-height: 100vh;
     overflow: visible;
     grid-template-rows: auto;
+  }
+
+  .hero-panel {
+    padding: 22px;
+  }
+
+  .environment-panel {
+    order: 2;
   }
 
   .hud-primary-group,
@@ -652,38 +653,269 @@ codex/add-crafting-system-to-backpack-fa5sqf
 
 @media (max-width: 640px) {
   .app-shell {
+    padding: 12px;
+    gap: 14px;
+  }
+
+  .hero-panel,
+  .panel {
+    border-radius: 18px;
+  }
+
+  .hero-panel {
     padding: 16px;
+    gap: 14px;
+  }
+
+  .hero-panel h1 {
+    font-size: 1.65rem;
+    line-height: 1.08;
+  }
+
+  .eyebrow {
+    font-size: 0.72rem;
+  }
+
+  .hero-copy {
+    font-size: 0.95rem;
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .hero-actions button,
+  .inventory-actions button,
+  .event-options button,
+  .crafting-item button {
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .panel-title {
+    margin-bottom: 12px;
+    font-size: 0.8rem;
   }
 
   .status-emblem,
   .status-emblem.compact {
-    grid-template-columns: 78px auto;
-    gap: 12px;
+    grid-template-columns: 64px auto;
+    gap: 10px;
     width: 100%;
   }
 
   .status-ring,
   .status-emblem.compact .status-ring {
-    width: 78px;
-    height: 78px;
+    width: 64px;
+    height: 64px;
   }
 
-  .day-wheel { width: 160px; height: 160px; }
+  .status-icon,
+  .status-emblem.compact .status-icon {
+    font-size: 1.4rem;
+  }
+
+  .status-meta strong {
+    font-size: 1.15rem;
+  }
+
+  .status-meta span {
+    font-size: 0.74rem;
+  }
+
+  .hud-layout {
+    gap: 12px;
+    min-height: auto;
+    padding-bottom: 4px;
+  }
+
+  .hud-primary-group,
+  .hud-secondary-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .day-wheel-wrap {
+    order: -1;
+    gap: 10px;
+  }
+
+  .day-wheel {
+    width: 132px;
+    height: 132px;
+    padding: 10px;
+  }
 
   .day-wheel-inner {
-    inset: 30px;
+    inset: 24px;
+    padding: 10px;
   }
 
   .day-wheel-label {
-    font-size: 1.6rem;
+    font-size: 1.2rem;
+  }
+
+  .day-wheel-sub {
+    font-size: 0.72rem;
+  }
+
+  .day-wheel-pointer {
+    width: 5px;
+    height: 52px;
+  }
+
+  .day-wheel-pointer::after {
+    top: -6px;
+    border-left-width: 7px;
+    border-right-width: 7px;
+    border-bottom-width: 12px;
+  }
+
+  .world-markers {
+    gap: 8px;
+  }
+
+  .world-chip {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+  }
+
+  .survival-notes {
+    gap: 8px;
+  }
+
+  .survival-rule {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .survival-rule p {
+    font-size: 0.88rem;
+  }
+
+  .backpack-layout {
+    gap: 14px;
   }
 
   .backpack-grid {
-    gap: 10px;
+    gap: 8px;
+  }
+
+  .backpack-slot {
+    border-radius: 14px;
+    padding: 8px;
+  }
+
+  .slot-index {
+    left: 8px;
+    top: 6px;
+    font-size: 0.65rem;
+  }
+
+  .slot-icon {
+    font-size: 1.5rem;
+  }
+
+  .slot-amount {
+    right: 8px;
+    bottom: 6px;
+    font-size: 0.72rem;
+  }
+
+  .slot-empty {
+    font-size: 0.74rem;
+  }
+
+  .inventory-card {
+    padding: 14px;
+    border-radius: 16px;
+    gap: 8px;
+  }
+
+  .inventory-card p,
+  .crafting-item p {
+    font-size: 0.92rem;
+  }
+
+  .inventory-icon {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    font-size: 1.6rem;
+  }
+
+  .inventory-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .crafting-item {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .card-row,
+  .card-row.compact {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(178px, 72vw);
+    grid-template-columns: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding-bottom: 6px;
+    margin-right: -2px;
+  }
+
+  .card-button {
+    scroll-snap-align: start;
+  }
+
+  .log-list {
+    gap: 8px;
+  }
+
+  .log-item {
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .hero-actions,
+  .inventory-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .hud-primary-group,
+  .hud-secondary-group {
+    grid-template-columns: 1fr;
+  }
+
+  .status-emblem,
+  .status-emblem.compact {
+    grid-template-columns: 58px auto;
+  }
+
+  .status-ring,
+  .status-emblem.compact .status-ring {
+    width: 58px;
+    height: 58px;
+  }
+
+  .backpack-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .card-row,
+  .card-row.compact {
+    grid-auto-columns: minmax(164px, 82vw);
   }
 }

@@ -30,6 +30,37 @@ export interface EnvironmentState {
   turn: number;
 }
 
+export type EndingType = 'rescued' | 'survived' | 'dead';
+
+export interface PrototypeGoal {
+  id: string;
+  day: number;
+  title: string;
+  description: string;
+}
+
+export interface JournalEntry {
+  day: number;
+  text: string;
+}
+
+export interface GameEnding {
+  type: EndingType;
+  title: string;
+  description: string;
+}
+
+export interface PrototypeProgress {
+  totalDays: number;
+  shelterBuilt: boolean;
+  jungleExplored: boolean;
+  caveExplored: boolean;
+  campfireCrafted: boolean;
+  spearCrafted: boolean;
+  beaconCrafted: boolean;
+  journal: JournalEntry[];
+}
+
 export interface ItemStackChange {
   itemId: string;
   amount: number;

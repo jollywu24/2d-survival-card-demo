@@ -10,21 +10,26 @@ import type {
   CraftingRecipe,
   EnvironmentState,
   EventDefinition,
+  GameEnding,
   ItemDefinition,
   ItemStackChange,
   LogEntry,
   PlayerState,
+  PrototypeGoal,
+  PrototypeProgress,
   StatKey,
 } from '../types/game';
 
 interface GameState {
   player: PlayerState;
   environment: EnvironmentState;
+  progress: PrototypeProgress;
   deck: CardDefinition[];
   hand: CardDefinition[];
   backpack: BackpackSlot[];
   selectedBackpackSlot: number | null;
   activeEvent: EventDefinition | null;
+  ending: GameEnding | null;
   logs: LogEntry[];
   useCard: (cardId: string) => void;
   resolveEvent: (optionId: string) => void;
@@ -41,6 +46,7 @@ const MAX_STAT = 100;
 const MIN_STAT = 0;
 const HAND_SIZE = 4;
 const BACKPACK_SIZE = 16;
+const TOTAL_DAYS = 7;
 
 const itemById = new Map(itemCatalog.map((item) => [item.id, item]));
 
@@ -59,6 +65,17 @@ const initialEnvironment = (): EnvironmentState => ({
   terrain: 'beach',
   day: 1,
   turn: 1,
+});
+
+const initialProgress = (): PrototypeProgress => ({
+  totalDays: TOTAL_DAYS,
+  shelterBuilt: false,
+  jungleExplored: false,
+  caveExplored: false,
+  campfireCrafted: false,
+  spearCrafted: false,
+  beaconCrafted: false,
+  journal: [],
 });
 
 const createInitialBackpack = (): BackpackSlot[] =>
@@ -288,6 +305,62 @@ const craftingRecipes: CraftingRecipe[] = [
     ],
     produces: [{ itemId: 'campfire-kit', amount: 2 }],
   },
+  {
+    id: 'signal-beacon',
+    name: '求救信标',
+    description: '将木矛、火种和纤维绑成显眼的求救信标，等待远处船只发现。',
+    requires: [
+      { itemId: 'spear', amount: 1 },
+      { itemId: 'campfire-kit', amount: 1 },
+      { itemId: 'palm-fiber', amount: 3 },
+    ],
+    produces: [{ itemId: 'signal-beacon', amount: 1 }],
+  },
+];
+
+const prototypeGoals: PrototypeGoal[] = [
+  {
+    id: 'stabilize-body',
+    day: 1,
+    title: '稳住基础生存',
+    description: '让饱腹和水分都保持在 45 以上，先活过第一天。',
+  },
+  {
+    id: 'prepare-fire',
+    day: 2,
+    title: '准备火源',
+    description: '合成或收集火种包，为夜晚和恶劣天气做准备。',
+  },
+  {
+    id: 'build-shelter',
+    day: 3,
+    title: '搭起庇护所',
+    description: '至少完成一次搭建庇护所，证明你有了稳定营地。',
+  },
+  {
+    id: 'explore-jungle',
+    day: 4,
+    title: '深入探索',
+    description: '进入丛林一次，拿到新的资源与草药。',
+  },
+  {
+    id: 'craft-weapon',
+    day: 5,
+    title: '准备自卫工具',
+    description: '制作木矛，面对危机时不再赤手空拳。',
+  },
+  {
+    id: 'signal-ready',
+    day: 6,
+    title: '搭建求救信号',
+    description: '在工作台合成求救信标，为第七天做最后准备。',
+  },
+  {
+    id: 'survive-until-rescue',
+    day: 7,
+    title: '撑到第七天',
+    description: '保持生命值大于 0，等待救援或迎来最终结局。',
+  },
 ];
 
 const countBackpackItems = (backpack: BackpackSlot[]) => {
@@ -342,12 +415,111 @@ const createInitialState = () => {
   return {
     player: initialPlayer(),
     environment: initialEnvironment(),
+    progress: initialProgress(),
     deck: starterDeck,
     hand: starterDeck.slice(0, HAND_SIZE),
     backpack: seeded,
     selectedBackpackSlot: null as number | null,
     activeEvent: null as EventDefinition | null,
+    ending: null as GameEnding | null,
     logs: [createLog('你在海滩醒来，身边只有零散的物资。')],
+  };
+};
+
+const updateProgressFromAction = (
+  progress: PrototypeProgress,
+  cardId: string,
+  gains: ItemStackChange[] = [],
+) => ({
+  ...progress,
+  shelterBuilt: progress.shelterBuilt || cardId === 'build-shelter',
+  jungleExplored: progress.jungleExplored || cardId === 'explore-jungle',
+  caveExplored: progress.caveExplored || cardId === 'enter-cave',
+  spearCrafted:
+    progress.spearCrafted ||
+    cardId === 'craft-spear' ||
+    gains.some((entry) => entry.itemId === 'spear'),
+});
+
+const appendJournalEntry = (
+  journal: PrototypeProgress['journal'],
+  day: number,
+  player: PlayerState,
+  progress: PrototypeProgress,
+) => {
+  const tone =
+    player.health < 35 || player.thirst < 30
+      ? '今天几乎被荒野拖垮，我清楚地感觉到身体在报警。'
+      : player.sanity < 40
+        ? '真正难熬的不是饥饿，而是夜里那种无人回应的空旷感。'
+        : '营地总算有了点秩序，我开始像个真正的求生者那样安排明天。';
+
+  const milestone = progress.beaconCrafted
+    ? '求救信标已经竖起来了，只差有人看见。'
+    : progress.shelterBuilt
+      ? '庇护所勉强成形，至少风雨来时不再完全暴露。'
+      : '我还在和最基础的生存问题搏斗。';
+
+  return [
+    {
+      day,
+      text: `第 ${day} 天夜里。${tone}${milestone}`,
+    },
+    ...journal,
+  ].slice(0, TOTAL_DAYS);
+};
+
+const getGoalCompletion = (
+  goalId: string,
+  player: PlayerState,
+  progress: PrototypeProgress,
+) => {
+  switch (goalId) {
+    case 'stabilize-body':
+      return player.hunger >= 45 && player.thirst >= 45;
+    case 'prepare-fire':
+      return progress.campfireCrafted;
+    case 'build-shelter':
+      return progress.shelterBuilt;
+    case 'explore-jungle':
+      return progress.jungleExplored;
+    case 'craft-weapon':
+      return progress.spearCrafted;
+    case 'signal-ready':
+      return progress.beaconCrafted;
+    case 'survive-until-rescue':
+      return player.health > 0;
+    default:
+      return false;
+  }
+};
+
+const createEnding = (
+  type: GameEnding['type'],
+  progress: PrototypeProgress,
+): GameEnding => {
+  if (type === 'dead') {
+    return {
+      type,
+      title: '求生失败',
+      description: '你的生命值已经归零。这次荒野挑战止步于此，但日志会记住你撑到的每一天。',
+    };
+  }
+
+  if (type === 'rescued') {
+    return {
+      type,
+      title: '第七天：获救',
+      description: '求救信标终于发挥作用。远处船只发现了你的火光，你带着这七天的痕迹离开了海岸。',
+    };
+  }
+
+  return {
+    type,
+    title: '撑过七天',
+    description: progress.beaconCrafted
+      ? '你成功撑过七天，虽然救援没有立刻到来，但营地已经足够支撑你继续活下去。'
+      : '你熬过了七天，却还没有建立起稳定的求救方案。这是生还，不是解脱。',
   };
 };
 
@@ -356,6 +528,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   useCard: (cardId) => {
     const state = get();
+    if (state.ending) {
+      return;
+    }
     const card = state.hand.find((item) => item.id === cardId);
 
     if (!card) {
@@ -371,6 +546,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const applied = applyEffect(state.player, state.environment, card.effect);
     const inventoryResult = addItemsToBackpack(state.backpack, card.effect.gainItems);
+    const nextProgress = updateProgressFromAction(state.progress, card.id, card.effect.gainItems);
     const nextHandBase = state.hand.filter((item) => item.id !== card.id);
     const nextHand = rotateDeck(state.deck, nextHandBase, 1 + (card.effect.drawCards ?? 0));
 
@@ -389,6 +565,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((current) => ({
       player: applied.player,
       environment: applied.environment,
+      progress: nextProgress,
       backpack: inventoryResult.backpack,
       hand: nextHand,
       activeEvent,
@@ -402,6 +579,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   resolveEvent: (optionId) => {
     const state = get();
+    if (state.ending) {
+      return;
+    }
     const event = state.activeEvent;
     const option = event?.options.find((item) => item.id === optionId);
 
@@ -428,12 +608,19 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   selectBackpackSlot: (slotIndex) => {
     set((state) => ({
-      selectedBackpackSlot: state.selectedBackpackSlot === slotIndex ? null : slotIndex,
+      selectedBackpackSlot: state.ending
+        ? state.selectedBackpackSlot
+        : state.selectedBackpackSlot === slotIndex
+          ? null
+          : slotIndex,
     }));
   },
 
   moveSelectedToSlot: (slotIndex) => {
     const state = get();
+    if (state.ending) {
+      return;
+    }
     const selected = state.selectedBackpackSlot;
 
     if (selected === null || selected === slotIndex) {
@@ -449,6 +636,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   useBackpackItem: (slotIndex) => {
     const state = get();
+    if (state.ending) {
+      return;
+    }
     const slot = state.backpack[slotIndex];
     if (!slot || slot.itemId === null) {
       return;
@@ -476,6 +666,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   discardBackpackItem: (slotIndex) => {
     const state = get();
+    if (state.ending) {
+      return;
+    }
     const slot = state.backpack[slotIndex];
     if (!slot || slot.itemId === null) {
       return;
@@ -494,6 +687,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   craftRecipe: (recipeId) => {
     const state = get();
+    if (state.ending) {
+      return;
+    }
     const recipe = craftingRecipes.find((entry) => entry.id === recipeId);
 
     if (!recipe) {
@@ -514,8 +710,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       .join('、');
     const overflowText =
       craftedResult.overflow.length > 0 ? ` 背包空间不足，掉落：${craftedResult.overflow.join('、')}。` : '';
+    const nextProgress: PrototypeProgress = {
+      ...state.progress,
+      campfireCrafted:
+        state.progress.campfireCrafted ||
+        recipe.produces.some((entry) => entry.itemId === 'campfire-kit'),
+      beaconCrafted:
+        state.progress.beaconCrafted ||
+        recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),
+    };
 
     set((current) => ({
+      progress: nextProgress,
       backpack: craftedResult.backpack,
       logs: [createLog(`你在工作台合成了【${recipe.name}】：${outputText}。${overflowText}`), ...current.logs].slice(0, 10),
     }));
@@ -523,6 +729,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   nextTurn: () => {
     const state = get();
+    if (state.ending) {
+      return;
+    }
+
+    if (state.player.health <= 0) {
+      set({
+        ending: createEnding('dead', state.progress),
+      });
+      return;
+    }
+
     const nextTurn = state.environment.turn + 1;
     const isNight = nextTurn % 2 === 0;
     const nextEnvironment: EnvironmentState = {
@@ -541,12 +758,44 @@ export const useGameStore = create<GameState>((set, get) => ({
       sanity: isNight ? -4 : 0,
     });
 
+    const progressAfterTurn: PrototypeProgress = {
+      ...state.progress,
+      journal: isNight
+        ? appendJournalEntry(state.progress.journal, state.environment.day, nextPlayer, state.progress)
+        : state.progress.journal,
+    };
+
+    const shouldEndByDeath = nextPlayer.health <= 0;
+    const shouldResolveSevenDayRun =
+      state.environment.day === TOTAL_DAYS && state.environment.timeOfDay === 'night' && !isNight;
+    const ending = shouldEndByDeath
+      ? createEnding('dead', progressAfterTurn)
+      : shouldResolveSevenDayRun
+        ? createEnding(progressAfterTurn.beaconCrafted ? 'rescued' : 'survived', progressAfterTurn)
+        : null;
+
+    const currentGoal = prototypeGoals.find((goal) => goal.day === Math.min(state.environment.day, TOTAL_DAYS));
+    const goalLog =
+      !isNight && currentGoal
+        ? [
+            createLog(
+              getGoalCompletion(currentGoal.id, nextPlayer, progressAfterTurn)
+                ? `今日目标完成：${currentGoal.title}`
+                : `今日目标未完成：${currentGoal.title}`,
+            ),
+          ]
+        : [];
+
     set((current) => ({
       player: nextPlayer,
       environment: nextEnvironment,
+      progress: progressAfterTurn,
       activeEvent: null,
+      ending,
       logs: [
         createLog(`进入第 ${nextEnvironment.day} 天 ${nextEnvironment.timeOfDay === 'day' ? '白天' : '夜晚'}，天气：${weatherLabel[nextEnvironment.weather]}`),
+        ...goalLog,
+        ...(ending ? [createLog(`结局：${ending.title}`)] : []),
         ...current.logs,
       ].slice(0, 10),
     }));
@@ -584,3 +833,9 @@ export const getItemDefinition = (itemId: string | null): ItemDefinition | null 
 export const allCraftingRecipes = craftingRecipes;
 export const canCraftInBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) =>
   canCraftRecipeFromBackpack(backpack, recipe);
+export const allPrototypeGoals = prototypeGoals;
+export const isPrototypeGoalComplete = (
+  goal: PrototypeGoal,
+  player: PlayerState,
+  progress: PrototypeProgress,
+) => getGoalCompletion(goal.id, player, progress);

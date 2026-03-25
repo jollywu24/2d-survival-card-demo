@@ -103,6 +103,31 @@ button:disabled {
   line-height: 1.6;
 }
 
+.ending-banner {
+  padding: 18px 20px;
+}
+
+.ending-banner h2 {
+  margin: 0 0 0.35rem;
+}
+
+.ending-banner p {
+  margin: 0;
+  color: #dbe3e7;
+}
+
+.ending-banner.rescued {
+  border-color: rgba(230, 199, 107, 0.5);
+}
+
+.ending-banner.survived {
+  border-color: rgba(112, 189, 155, 0.5);
+}
+
+.ending-banner.dead {
+  border-color: rgba(201, 88, 69, 0.55);
+}
+
 .hero-actions,
 .inventory-actions,
 .event-options {
@@ -402,6 +427,123 @@ button:disabled {
   margin: 0;
   color: #d2dbe0;
   line-height: 1.6;
+}
+
+.prototype-summary,
+.journal-list {
+  display: grid;
+  gap: 10px;
+}
+
+.prototype-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #f0dec0;
+}
+
+.prototype-progress-head span {
+  color: #bfcad0;
+  font-size: 0.85rem;
+}
+
+.prototype-progress-bar {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prototype-progress-bar > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #d9b55a 0%, #76c7a0 100%);
+}
+
+.active-goal-card,
+.journal-entry {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.active-goal-card strong,
+.journal-entry strong {
+  display: block;
+  color: #f3d493;
+}
+
+.active-goal-card p,
+.journal-entry p {
+  margin: 6px 0 0;
+  color: #d5dde1;
+  line-height: 1.55;
+}
+
+.goal-day-tag,
+.goal-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+}
+
+.goal-day-tag {
+  width: fit-content;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e7cc8f;
+}
+
+.goal-status {
+  margin-top: 10px;
+}
+
+.goal-status.done {
+  background: rgba(110, 191, 152, 0.18);
+  color: #88d5b0;
+}
+
+.goal-status.pending {
+  background: rgba(231, 188, 109, 0.14);
+  color: #f0cf8a;
+}
+
+.goal-list {
+  display: grid;
+  gap: 8px;
+}
+
+.goal-row {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cad4d8;
+}
+
+.goal-row span {
+  color: #91856e;
+  font-size: 0.82rem;
+}
+
+.goal-row.done {
+  background: rgba(110, 191, 152, 0.12);
+}
+
+.goal-row.done strong {
+  color: #87d4af;
+}
+
+.journal-entry.empty strong {
+  color: #d3bf95;
 }
 
 .backpack-panel {
@@ -799,6 +941,17 @@ button:disabled {
     font-size: 0.88rem;
   }
 
+  .prototype-progress-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .goal-row {
+    grid-template-columns: 54px 1fr;
+    gap: 10px;
+    padding: 10px;
+  }
+
   .backpack-layout {
     gap: 14px;
   }
@@ -839,7 +992,9 @@ button:disabled {
   }
 
   .inventory-card p,
-  .crafting-item p {
+  .crafting-item p,
+  .active-goal-card p,
+  .journal-entry p {
     font-size: 0.92rem;
   }
 

@@ -63,4 +63,12 @@ export const itemCatalog: ItemDefinition[] = [
     description: '编织和搭建时很有用的材料。',
     maxStack: 8,
   },
+  {
+    id: 'signal-beacon',
+    name: '求救信标',
+    type: 'tool',
+    icon: '🚨',
+    description: '用火种、长杆和纤维做成的求救装置，象征你已经准备好被发现。',
+    maxStack: 1,
+  },
 ];

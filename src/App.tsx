@@ -2,8 +2,10 @@
 import { CardCanvas } from './components/CardCanvas';
 import {
   allCraftingRecipes,
+  allPrototypeGoals,
   canCraftInBackpack,
   getItemDefinition,
+  isPrototypeGoalComplete,
   meetsCondition,
   terrainLabel,
   timeLabel,
@@ -35,6 +37,8 @@ function App() {
     backpack,
     selectedBackpackSlot,
     activeEvent,
+    ending,
+    progress,
     logs,
     nextTurn,
     resetGame,
@@ -51,6 +55,12 @@ function App() {
   const selectedSlot =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
   const selectedItem = selectedSlot ? getItemDefinition(selectedSlot.itemId) : null;
+  const activeGoal = allPrototypeGoals.find(
+    (goal) => goal.day === Math.min(environment.day, progress.totalDays),
+  );
+  const completedGoalCount = allPrototypeGoals.filter((goal) =>
+    isPrototypeGoalComplete(goal, player, progress),
+  ).length;
 
   const handleSlotClick = (slot: BackpackSlot) => {
     if (selectedBackpackSlot !== null && selectedBackpackSlot !== slot.slotIndex) {
@@ -66,7 +76,9 @@ function App() {
         <div>
           <p className="eyebrow">2D 荒野求生卡牌 Demo</p>
           <h1>生存工作台</h1>
-          <p className="hero-copy">一屏查看状态、背包、合成、手牌和日志。</p>
+          <p className="hero-copy">
+            7天生存原型：在第七天结束前活下来，并尽量完成求救信标。
+          </p>
         </div>
         <div className="hero-actions">
           <button type="button" onClick={nextTurn}>
@@ -78,65 +90,128 @@ function App() {
         </div>
       </section>
 
+      {ending && (
+        <section className={`panel ending-banner ${ending.type}`}>
+          <div className="panel-title">本局结算</div>
+          <h2>{ending.title}</h2>
+          <p>{ending.description}</p>
+        </section>
+      )}
+
       <section className="workbench-grid">
-        <div className="panel hud-panel left-column">
-          <div className="panel-title">生存 HUD</div>
-          <div className="hud-layout">
-            <div className="hud-primary-group">
-              {primaryStats.map((key) => (
-                <StatusEmblem key={key} statKey={key} value={player[key]} />
+        <section className="left-column">
+          <div className="panel hud-panel">
+            <div className="panel-title">生存 HUD</div>
+            <div className="hud-layout">
+              <div className="hud-primary-group">
+                {primaryStats.map((key) => (
+                  <StatusEmblem key={key} statKey={key} value={player[key]} />
+                ))}
+              </div>
+
+              <div className="day-wheel-wrap">
+                <div
+                  className="day-wheel"
+                  style={
+                    {
+                      '--clock-progress': `${clockProgress}turn`,
+                    } as CSSProperties
+                  }
+                >
+                  <div className="day-wheel-inner">
+                    <span className="day-wheel-label">Day {environment.day}</span>
+                    <span className="day-wheel-sub">{timeLabel[environment.timeOfDay]}</span>
+                  </div>
+                  <div className="day-wheel-pointer" />
+                </div>
+
+                <div className="world-markers">
+                  <span className={`world-chip ${environment.weather}`}>
+                    {weatherLabel[environment.weather]}
+                  </span>
+                  <span className="world-chip terrain">{terrainLabel[environment.terrain]}</span>
+                </div>
+              </div>
+            </div>
+            <div className="hud-secondary-group horizontal">
+              {secondaryStats.map((key) => (
+                <StatusEmblem key={key} statKey={key} value={player[key]} compact />
               ))}
             </div>
+          </div>
 
-            <div className="day-wheel-wrap">
-              <div
-                className="day-wheel"
-                style={
-                  {
-                    '--clock-progress': `${clockProgress}turn`,
-                  } as CSSProperties
-                }
-              >
-                <div className="day-wheel-inner">
-                  <span className="day-wheel-label">Day {environment.day}</span>
-                  <span className="day-wheel-sub">{timeLabel[environment.timeOfDay]}</span>
-                </div>
-                <div className="day-wheel-pointer" />
+          <div className="panel environment-panel">
+            <div className="panel-title">7天原型进度</div>
+            <div className="prototype-summary">
+              <div className="prototype-progress-head">
+                <strong>
+                  Day {Math.min(environment.day, progress.totalDays)} / {progress.totalDays}
+                </strong>
+                <span>{completedGoalCount} / {allPrototypeGoals.length} 目标完成</span>
               </div>
-
-              <div className="world-markers">
-                <span className={`world-chip ${environment.weather}`}>
-                  {weatherLabel[environment.weather]}
-                </span>
-                <span className="world-chip terrain">{terrainLabel[environment.terrain]}</span>
+              <div className="prototype-progress-bar">
+                <div style={{ width: `${(completedGoalCount / allPrototypeGoals.length) * 100}%` }} />
+              </div>
+              {activeGoal && (
+                <div className="active-goal-card">
+                  <span className="goal-day-tag">今日目标</span>
+                  <strong>{activeGoal.title}</strong>
+                  <p>{activeGoal.description}</p>
+                  <span className={`goal-status ${isPrototypeGoalComplete(activeGoal, player, progress) ? 'done' : 'pending'}`}>
+                    {isPrototypeGoalComplete(activeGoal, player, progress) ? '已完成' : '进行中'}
+                  </span>
+                </div>
+              )}
+              <div className="goal-list">
+                {allPrototypeGoals.map((goal) => (
+                  <div key={goal.id} className={`goal-row ${isPrototypeGoalComplete(goal, player, progress) ? 'done' : ''}`}>
+                    <span>Day {goal.day}</span>
+                    <strong>{goal.title}</strong>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-          <div className="hud-secondary-group horizontal">
-            {secondaryStats.map((key) => (
-              <StatusEmblem key={key} statKey={key} value={player[key]} compact />
-            ))}
-          </div>
-        </div>
 
-        <div className="panel environment-panel left-column">
-          <div className="panel-title">生存提示</div>
-          <div className="survival-notes">
-            <SurvivalRule title="昼夜" text="夜晚会持续拉低理智与体力，生火与休息更关键。" />
-            <SurvivalRule title="气候" text="雨天和风暴会压低体温，洞穴和火源更安全。" />
-            <SurvivalRule title="背包" text="先点选一个物品，再点另一个格子就能重新摆放。" />
+          <div className="panel environment-panel panel-scroll">
+            <div className="panel-title">夜间日记</div>
+            <div className="journal-list">
+              {progress.journal.length > 0 ? (
+                progress.journal.map((entry) => (
+                  <div key={entry.day} className="journal-entry">
+                    <strong>第 {entry.day} 天</strong>
+                    <p>{entry.text}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="journal-entry empty">
+                  <strong>尚未入夜</strong>
+                  <p>每个夜晚结束时会自动写下一段求生日记，记录你这一天的状态与感受。</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <section className="panel panel-scroll log-column left-column">
-          <div className="panel-title">日志</div>
-          <div className="log-list">
-            {logs.map((log) => (
-              <div key={log.id} className="log-item">
-                {log.text}
-              </div>
-            ))}
+          <div className="panel environment-panel">
+            <div className="panel-title">生存提示</div>
+            <div className="survival-notes">
+              <SurvivalRule title="昼夜" text="夜晚会持续拉低理智与体力，生火与休息更关键。" />
+              <SurvivalRule title="气候" text="雨天和风暴会压低体温，洞穴和火源更安全。" />
+              <SurvivalRule title="目标" text="第6天前完成求救信标，第7天夜晚会结算是否获救。" />
+              <SurvivalRule title="背包" text="先点选一个物品，再点另一个格子就能重新摆放。" />
+            </div>
           </div>
+
+          <section className="panel panel-scroll log-column">
+            <div className="panel-title">日志</div>
+            <div className="log-list">
+              {logs.map((log) => (
+                <div key={log.id} className="log-item">
+                  {log.text}
+                </div>
+              ))}
+            </div>
+          </section>
         </section>
 
         <section className="panel backpack-panel center-column">

@@ -28,6 +28,8 @@ export interface EnvironmentState {
   terrain: Terrain;
   day: number;
   turn: number;
+  actionsRemaining: number;
+  actionLimit: number;
 }
 
 export type EndingType = 'rescued' | 'survived' | 'dead';
@@ -96,6 +98,7 @@ export interface CardDefinition {
   name: string;
   type: CardType;
   description: string;
+  actionCost?: number;
   effect: CardEffect;
   condition?: CardCondition;
 }

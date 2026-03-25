@@ -51,7 +51,8 @@ function App() {
     useCard,
   } = useGameStore();
 
-  const clockProgress = ((environment.turn - 1) % 2) / 2;
+  const phaseProgressMap = { day: 0, dusk: 1 / 3, night: 2 / 3 } as const;
+  const clockProgress = phaseProgressMap[environment.timeOfDay];
   const selectedSlot =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
   const selectedItem = selectedSlot ? getItemDefinition(selectedSlot.itemId) : null;
@@ -81,6 +82,9 @@ function App() {
           </p>
         </div>
         <div className="hero-actions">
+          <span className="phase-action-pill">
+            {timeLabel[environment.timeOfDay]} · {environment.actionsRemaining}/{environment.actionLimit} 次行动
+          </span>
           <button type="button" onClick={nextTurn}>
             推进阶段
           </button>
@@ -159,6 +163,9 @@ function App() {
                   <span className="goal-day-tag">今日目标</span>
                   <strong>{activeGoal.title}</strong>
                   <p>{activeGoal.description}</p>
+                  <span className="goal-day-tag subtle">
+                    本阶段剩余行动：{environment.actionsRemaining}
+                  </span>
                   <span className={`goal-status ${isPrototypeGoalComplete(activeGoal, player, progress) ? 'done' : 'pending'}`}>
                     {isPrototypeGoalComplete(activeGoal, player, progress) ? '已完成' : '进行中'}
                   </span>
@@ -198,6 +205,7 @@ function App() {
             <div className="panel-title">生存提示</div>
             <div className="survival-notes">
               <SurvivalRule title="昼夜" text="夜晚会持续拉低理智与体力，生火与休息更关键。" />
+              <SurvivalRule title="阶段" text="白天可行动 2 次，黄昏 1 次，夜晚 1 次；部分行动只能在特定阶段执行。" />
               <SurvivalRule title="气候" text="雨天和风暴会压低体温，洞穴和火源更安全。" />
               <SurvivalRule title="目标" text="第6天前完成求救信标，第7天夜晚会结算是否获救。" />
               <SurvivalRule title="背包" text="先点选一个物品，再点另一个格子就能重新摆放。" />
@@ -255,9 +263,14 @@ function App() {
                     <div className="inventory-meta">
                       <span>数量 x{selectedSlot.amount}</span>
                       <span>类型 {selectedItem.type}</span>
+                      <span>消耗 1 行动</span>
                     </div>
                     <div className="inventory-actions">
-                      <button type="button" onClick={() => useBackpackItem(selectedSlot.slotIndex)}>
+                      <button
+                        type="button"
+                        disabled={!!activeEvent || environment.actionsRemaining < 1 || !!ending}
+                        onClick={() => useBackpackItem(selectedSlot.slotIndex)}
+                      >
                         使用
                       </button>
                       <button
@@ -290,6 +303,7 @@ function App() {
                           <strong>{recipe.name}</strong>
                           <p>{recipe.description}</p>
                           <div className="crafting-meta">
+                            <span>消耗：1 行动</span>
                             <span>
                               材料：
                               {recipe.requires
@@ -310,7 +324,11 @@ function App() {
                             </span>
                           </div>
                         </div>
-                        <button type="button" disabled={!canCraft} onClick={() => craftRecipe(recipe.id)}>
+                        <button
+                          type="button"
+                          disabled={!canCraft || !!activeEvent || environment.actionsRemaining < 1 || !!ending}
+                          onClick={() => craftRecipe(recipe.id)}
+                        >
                           {canCraft ? '合成' : '材料不足'}
                         </button>
                       </div>
@@ -342,14 +360,21 @@ function App() {
             <div className="panel-title">手牌</div>
             <div className="card-row compact">
               {hand.map((card) => {
-                const disabled = !meetsCondition(player, environment, card.condition);
+                const actionCost = card.actionCost ?? 1;
+                const disabled =
+                  !meetsCondition(player, environment, card.condition) ||
+                  !!activeEvent ||
+                  !!ending ||
+                  environment.actionsRemaining < actionCost;
                 return (
-                  <CardCanvas
-                    key={card.id}
-                    card={card}
-                    disabled={disabled}
-                    onClick={() => useCard(card.id)}
-                  />
+                  <div key={card.id} className="card-stack">
+                    <CardCanvas
+                      card={card}
+                      disabled={disabled}
+                      onClick={() => useCard(card.id)}
+                    />
+                    <div className="card-cost-tag">消耗 {actionCost} 行动</div>
+                  </div>
                 );
               })}
             </div>

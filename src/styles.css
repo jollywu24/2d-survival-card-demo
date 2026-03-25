@@ -136,6 +136,17 @@ button:disabled {
   gap: 12px;
 }
 
+.phase-action-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 0.95rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1dfba;
+  font-size: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .dashboard,
 .workbench-grid {
   display: grid;
@@ -499,6 +510,11 @@ button:disabled {
   color: #e7cc8f;
 }
 
+.goal-day-tag.subtle {
+  margin-bottom: 0;
+  color: #d1d8dd;
+}
+
 .goal-status {
   margin-top: 10px;
 }
@@ -735,6 +751,20 @@ button:disabled {
   overflow: hidden;
 }
 
+.card-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.card-cost-tag {
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  width: fit-content;
+  background: rgba(255, 255, 255, 0.05);
+  color: #d8c49c;
+  font-size: 0.78rem;
+}
+
 .card-button {
   width: 100%;
   padding: 0;
@@ -826,6 +856,11 @@ button:disabled {
     display: grid;
     grid-template-columns: 1fr 1fr;
     width: 100%;
+  }
+
+  .phase-action-pill {
+    grid-column: 1 / -1;
+    justify-content: center;
   }
 
   .hero-actions button,
@@ -1030,6 +1065,11 @@ button:disabled {
 
   .card-button {
     scroll-snap-align: start;
+  }
+
+  .card-cost-tag {
+    font-size: 0.72rem;
+    padding: 0.32rem 0.6rem;
   }
 
   .log-list {

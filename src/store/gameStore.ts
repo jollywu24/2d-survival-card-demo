@@ -48,6 +48,11 @@ const HAND_SIZE = 4;
 const BACKPACK_SIZE = 16;
 const TOTAL_DAYS = 7;
 const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
+const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
+  day: 2,
+  dusk: 1,
+  night: 1,
+};
 
 const itemById = new Map(itemCatalog.map((item) => [item.id, item]));
 
@@ -66,6 +71,8 @@ const initialEnvironment = (): EnvironmentState => ({
   terrain: 'beach',
   day: 1,
   turn: 1,
+  actionsRemaining: PHASE_ACTION_LIMIT.day,
+  actionLimit: PHASE_ACTION_LIMIT.day,
 });
 
 const initialProgress = (): PrototypeProgress => ({
@@ -567,6 +574,14 @@ const getPhaseStatDecay = (
   };
 };
 
+const canAffordAction = (environment: EnvironmentState, cost: number) =>
+  environment.actionsRemaining >= cost;
+
+const spendActions = (environment: EnvironmentState, cost: number): EnvironmentState => ({
+  ...environment,
+  actionsRemaining: Math.max(0, environment.actionsRemaining - cost),
+});
+
 export const useGameStore = create<GameState>((set, get) => ({
   ...createInitialState(),
 
@@ -575,9 +590,26 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.ending) {
       return;
     }
+    if (state.activeEvent) {
+      set((current) => ({
+        logs: [createLog('请先处理当前事件，再执行新的行动。'), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
     const card = state.hand.find((item) => item.id === cardId);
 
     if (!card) {
+      return;
+    }
+
+    const actionCost = card.actionCost ?? 1;
+    if (!canAffordAction(state.environment, actionCost)) {
+      set((current) => ({
+        logs: [
+          createLog(`【${card.name}】需要 ${actionCost} 点行动次数，但本阶段只剩 ${state.environment.actionsRemaining} 点。`),
+          ...current.logs,
+        ].slice(0, 10),
+      }));
       return;
     }
 
@@ -589,6 +621,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const applied = applyEffect(state.player, state.environment, card.effect);
+    const environmentAfterAction = spendActions(applied.environment, actionCost);
     const inventoryResult = addItemsToBackpack(state.backpack, card.effect.gainItems);
     const nextProgress = updateProgressFromAction(state.progress, card.id, card.effect.gainItems);
     const nextHandBase = state.hand.filter((item) => item.id !== card.id);
@@ -596,7 +629,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const eventRoll = Math.random();
     const eventChance = 0.3 + (card.effect.eventChanceBonus ?? 0);
-    const activeEvent = eventRoll < eventChance ? pickEvent(applied.player, applied.environment) : null;
+    const activeEvent = eventRoll < eventChance ? pickEvent(applied.player, environmentAfterAction) : null;
     const itemGainText =
       card.effect.gainItems && card.effect.gainItems.length > 0
         ? ` 获得：${card.effect.gainItems
@@ -608,7 +641,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set((current) => ({
       player: applied.player,
-      environment: applied.environment,
+      environment: environmentAfterAction,
       progress: nextProgress,
       backpack: inventoryResult.backpack,
       hand: nextHand,
@@ -683,6 +716,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.ending) {
       return;
     }
+    if (state.activeEvent) {
+      set((current) => ({
+        logs: [createLog('请先处理当前事件，再使用背包物品。'), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
     const slot = state.backpack[slotIndex];
     if (!slot || slot.itemId === null) {
       return;
@@ -696,12 +735,24 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
+    const actionCost = 1;
+    if (!canAffordAction(state.environment, actionCost)) {
+      set((current) => ({
+        logs: [
+          createLog(`本阶段行动次数不足，无法使用【${item.name}】。`),
+          ...current.logs,
+        ].slice(0, 10),
+      }));
+      return;
+    }
+
     const applied = applyEffect(state.player, state.environment, item.effect);
+    const environmentAfterAction = spendActions(applied.environment, actionCost);
     const inventoryResult = addItemsToBackpack(consumeOneFromSlot(state.backpack, slotIndex), item.effect.gainItems);
 
     set((current) => ({
       player: applied.player,
-      environment: applied.environment,
+      environment: environmentAfterAction,
       backpack: inventoryResult.backpack,
       selectedBackpackSlot: current.selectedBackpackSlot === slotIndex ? null : current.selectedBackpackSlot,
       logs: [createLog(`你使用了背包物品【${item.name}】。`), ...current.logs].slice(0, 10),
@@ -734,6 +785,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.ending) {
       return;
     }
+    if (state.activeEvent) {
+      set((current) => ({
+        logs: [createLog('请先处理当前事件，再进行合成。'), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
     const recipe = craftingRecipes.find((entry) => entry.id === recipeId);
 
     if (!recipe) {
@@ -743,6 +800,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!canCraftRecipeFromBackpack(state.backpack, recipe)) {
       set((current) => ({
         logs: [createLog(`【${recipe.name}】材料不足，无法合成。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+
+    const actionCost = 1;
+    if (!canAffordAction(state.environment, actionCost)) {
+      set((current) => ({
+        logs: [
+          createLog(`本阶段行动次数不足，无法合成【${recipe.name}】。`),
+          ...current.logs,
+        ].slice(0, 10),
       }));
       return;
     }
@@ -766,6 +834,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set((current) => ({
       progress: nextProgress,
+      environment: spendActions(current.environment, actionCost),
       backpack: craftedResult.backpack,
       logs: [createLog(`你在工作台合成了【${recipe.name}】：${outputText}。${overflowText}`), ...current.logs].slice(0, 10),
     }));
@@ -793,6 +862,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       timeOfDay: nextPhase,
       day: state.environment.day + (startOfNewDay ? 1 : 0),
       weather: ['sunny', 'rain', 'storm'][Math.floor(Math.random() * 3)] as EnvironmentState['weather'],
+      actionsRemaining: PHASE_ACTION_LIMIT[nextPhase],
+      actionLimit: PHASE_ACTION_LIMIT[nextPhase],
     };
 
     const nextPlayer = applyStatChanges(
@@ -840,7 +911,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       ending,
       logs: [
         createLog(
-          `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}`,
+          `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}，可行动 ${nextEnvironment.actionLimit} 次。`,
         ),
         ...goalLog,
         ...(ending ? [createLog(`结局：${ending.title}`)] : []),

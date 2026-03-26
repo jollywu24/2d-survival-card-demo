@@ -57,8 +57,8 @@ button {
 
 .game-shell {
   display: grid;
-  grid-template-rows: 56px minmax(0, 1fr) 228px;
-  grid-template-columns: 228px minmax(0, 1fr) 240px;
+  grid-template-rows: 54px minmax(0, 1fr) 188px;
+  grid-template-columns: 208px minmax(0, 1fr) 220px;
   min-height: 100vh;
   background:
     radial-gradient(circle at 50% 35%, rgba(122, 92, 46, 0.11), transparent 45%),
@@ -69,8 +69,8 @@ button {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 0 22px;
+  gap: 16px;
+  padding: 0 16px;
   background: rgba(18, 23, 29, 0.94);
   border-bottom: 1px solid rgba(180, 160, 110, 0.16);
   position: relative;
@@ -79,7 +79,7 @@ button {
 
 .game-title {
   font-family: "Crimson Pro", "Noto Serif SC", serif;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: 0.05em;
   color: var(--sand);
@@ -147,18 +147,18 @@ button {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .weather-box {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 12px;
+  gap: 6px;
+  padding: 4px 10px;
   border-radius: 2px;
   border: 1px solid rgba(180, 160, 110, 0.14);
   color: var(--parch-mid);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .weather-icon {
@@ -189,7 +189,7 @@ button {
   border: 1px solid rgba(180, 160, 110, 0.24);
   background: transparent;
   color: var(--parch);
-  padding: 9px 16px;
+  padding: 7px 12px;
   border-radius: 3px;
 }
 
@@ -225,7 +225,7 @@ button {
 .panel-needs,
 .panel-info {
   background: rgba(22, 29, 39, 0.94);
-  padding: 18px 16px;
+  padding: 12px;
   overflow-y: auto;
 }
 
@@ -247,20 +247,20 @@ button {
 }
 
 .panel-label {
-  margin-bottom: 14px;
-  padding-bottom: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
   border-bottom: 1px solid rgba(180, 160, 110, 0.1);
 }
 
 .panel-label.compact {
-  margin: 16px 0 10px;
+  margin: 12px 0 8px;
 }
 
 .need-row {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: 10px 6px;
+  padding: 8px 4px;
   margin: 0 -6px;
   border-bottom: 1px solid rgba(180, 160, 110, 0.06);
   border-radius: 3px;
@@ -281,7 +281,7 @@ button {
   align-items: center;
   gap: 6px;
   color: var(--parch-mid);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .need-dot {
@@ -292,7 +292,7 @@ button {
 
 .need-val {
   font-family: "Crimson Pro", serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -398,7 +398,6 @@ button {
 }
 
 .left-note,
-.goal-paper,
 .selected-paper {
   margin-top: 14px;
   padding: 12px 14px;
@@ -410,7 +409,6 @@ button {
 }
 
 .left-note strong,
-.goal-paper strong,
 .selected-paper h3 {
   display: block;
   margin-bottom: 6px;
@@ -419,7 +417,6 @@ button {
 }
 
 .left-note p,
-.goal-paper p,
 .selected-paper p {
   margin: 0;
   line-height: 1.6;
@@ -427,12 +424,15 @@ button {
   font-size: 13px;
 }
 
-.left-note span,
-.goal-paper span {
+.left-note span {
   display: block;
   margin-top: 8px;
   font-size: 11px;
   color: rgba(26, 18, 8, 0.62);
+}
+
+.goal-progress {
+  font-weight: 600;
 }
 
 .panel-field {
@@ -443,7 +443,7 @@ button {
 }
 
 .scene-strip {
-  height: 102px;
+  height: 84px;
   position: relative;
   overflow: hidden;
   border-bottom: 1px solid rgba(180, 160, 110, 0.08);
@@ -490,8 +490,8 @@ button {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 30px;
-  height: 48px;
+  bottom: 24px;
+  height: 40px;
 }
 
 .terrain-silhouette {
@@ -524,8 +524,8 @@ button {
 
 .terrain-label {
   position: absolute;
-  left: 20px;
-  bottom: 8px;
+  left: 16px;
+  bottom: 6px;
   font-size: 10px;
   color: var(--ink-faint);
   letter-spacing: 0.16em;
@@ -578,10 +578,10 @@ button {
 
 .card-workspace {
   flex: 1;
-  padding: 18px 22px;
+  padding: 12px 16px;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
-  gap: 14px;
+  gap: 10px;
   min-height: 0;
 }
 
@@ -594,27 +594,27 @@ button {
 
 .workspace-title {
   color: var(--parch);
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: 0.04em;
 }
 
 .workspace-subtitle {
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--ink-faint);
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .drop-zone {
-  width: 220px;
-  height: 54px;
+  width: 196px;
+  height: 42px;
   border: 1px dashed rgba(180, 160, 110, 0.22);
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: rgba(180, 160, 110, 0.3);
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.08em;
 }
 
@@ -626,7 +626,7 @@ button {
 
 .workspace-board {
   position: relative;
-  min-height: 280px;
+  min-height: 226px;
   border-radius: 6px;
   border: 1px dashed rgba(180, 160, 110, 0.12);
   background:
@@ -648,9 +648,9 @@ button {
 
 .work-card {
   position: absolute;
-  width: 132px;
-  min-height: 88px;
-  padding: 12px;
+  width: 112px;
+  min-height: 74px;
+  padding: 10px;
   border-radius: 5px;
   border: 1px solid rgba(180, 160, 110, 0.16);
   background:
@@ -658,7 +658,7 @@ button {
   color: var(--ink);
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: 4px;
   text-align: center;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
@@ -666,7 +666,7 @@ button {
 .backpack-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .backpack-slot {
@@ -702,7 +702,7 @@ button {
 }
 
 .slot-icon {
-  font-size: 28px;
+  font-size: 24px;
 }
 
 .slot-amount {
@@ -746,52 +746,52 @@ button {
 }
 
 .work-card-icon {
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .work-card-name {
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .slot-0 {
-  top: 24px;
-  left: 28px;
+  top: 16px;
+  left: 22px;
 }
 
 .slot-1 {
-  top: 68px;
-  left: 120px;
+  top: 52px;
+  left: 98px;
 }
 
 .slot-2 {
-  top: 38px;
-  left: 238px;
+  top: 22px;
+  left: 196px;
 }
 
 .slot-3 {
-  top: 116px;
-  left: 320px;
+  top: 88px;
+  left: 278px;
 }
 
 .slot-4 {
-  top: 158px;
-  left: 152px;
+  top: 130px;
+  left: 126px;
 }
 
 .slot-5 {
-  top: 182px;
-  left: 18px;
+  top: 142px;
+  left: 10px;
 }
 
 .workspace-bottom {
   display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(200px, 0.92fr) minmax(260px, 1.08fr);
+  gap: 12px;
 }
 
 .recipe-preview {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: 4px;
   border: 1px solid rgba(180, 160, 110, 0.16);
   background: rgba(30, 40, 54, 0.82);
@@ -812,14 +812,14 @@ button {
 
 .recipe-name {
   color: var(--parch);
-  font-size: 16px;
-  margin-bottom: 6px;
+  font-size: 15px;
+  margin-bottom: 4px;
 }
 
 .recipe-line {
   color: var(--parch-mid);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .recipe-line.subtle {
@@ -867,7 +867,7 @@ button {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .paper-meta span {
@@ -882,19 +882,18 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .body-grid,
-.recipe-scroll,
 .log-stack {
   display: grid;
   gap: 8px;
 }
 
 .info-section {
-  padding-bottom: 14px;
-  margin-bottom: 14px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
   border-bottom: 1px solid rgba(180, 160, 110, 0.08);
 }
 
@@ -908,9 +907,9 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: 3px;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   background: transparent;
   border: 1px solid rgba(180, 160, 110, 0.08);
   text-align: left;
@@ -950,8 +949,7 @@ button {
   font-size: 10px;
 }
 
-.body-chip,
-.recipe-mini {
+.body-chip {
   padding: 10px 12px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.03);
@@ -963,30 +961,18 @@ button {
   justify-content: space-between;
   align-items: center;
   color: var(--parch-mid);
+  padding: 8px 10px;
 }
 
 .body-chip strong {
   color: var(--parch);
 }
 
-.recipe-mini strong {
-  display: block;
-  color: var(--parch);
-  font-size: 12px;
-  margin-bottom: 3px;
-}
-
-.recipe-mini p {
-  margin: 0;
+.log-entry {
   font-size: 10px;
   color: var(--ink-faint);
-}
-
-.log-entry {
-  font-size: 11px;
-  color: var(--ink-faint);
-  line-height: 1.6;
-  padding: 4px 0;
+  line-height: 1.45;
+  padding: 3px 0;
   border-bottom: 1px solid rgba(180, 160, 110, 0.05);
 }
 
@@ -1003,11 +989,10 @@ button {
 
 .panel-hand {
   grid-column: 1 / -1;
-  position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 18px 20px 20px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px 14px;
   overflow-x: auto;
   overflow-y: hidden;
   background: rgba(22, 29, 39, 0.96);
@@ -1019,21 +1004,33 @@ button {
   display: none;
 }
 
+.hand-head {
+  flex: 0 0 84px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 8px;
+}
+
 .hand-label {
-  position: absolute;
-  left: 20px;
-  top: 7px;
+  position: static;
   color: rgba(180, 160, 110, 0.3);
+}
+
+.hand-count {
+  color: var(--sand);
+  font-size: 11px;
 }
 
 .hand-card-wrap {
   flex-shrink: 0;
-  width: 112px;
+  width: 96px;
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .hand-card-wrap:hover {
-  transform: translateY(-14px) scale(1.04);
+  transform: translateY(-10px) scale(1.03);
 }
 
 .card-button {
@@ -1100,14 +1097,6 @@ button {
 .type-skill {
   background: rgba(107, 74, 139, 0.35);
   color: #aa88cc;
-}
-
-.action-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-left: auto;
-  flex-shrink: 0;
 }
 
 .journal-overlay,
@@ -1310,7 +1299,7 @@ button {
 @media (max-width: 1200px) {
   .game-shell {
     grid-template-columns: 220px minmax(0, 1fr);
-    grid-template-rows: 56px auto auto 228px;
+    grid-template-rows: 56px auto auto 196px;
   }
 
   .panel-info {
@@ -1365,10 +1354,6 @@ button {
 
   .panel-hand {
     padding-bottom: 18px;
-  }
-
-  .action-row {
-    margin-left: 0;
   }
 }
 

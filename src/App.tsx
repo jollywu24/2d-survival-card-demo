@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { CardCanvas } from './components/CardCanvas';
 import {
-  allCraftingRecipes,
   allPrototypeGoals,
   getItemDefinition,
   getWorkbenchRecipePreview,
@@ -17,24 +16,23 @@ import type { BackpackSlot, EnvironmentState, StatKey } from './types/game';
 const coreNeedMeta: Array<{
   key: Extract<StatKey, 'hunger' | 'thirst' | 'temperature' | 'sanity'>;
   label: string;
-  icon: string;
   className: string;
 }> = [
-  { key: 'hunger', label: '饱腹', icon: '肉', className: 'n-hunger' },
-  { key: 'thirst', label: '水分', icon: '水', className: 'n-water' },
-  { key: 'temperature', label: '体温', icon: '火', className: 'n-temp' },
-  { key: 'sanity', label: '精神', icon: '心', className: 'n-mind' },
+  { key: 'hunger', label: '饱腹', className: 'n-hunger' },
+  { key: 'thirst', label: '水分', className: 'n-water' },
+  { key: 'temperature', label: '体温', className: 'n-temp' },
+  { key: 'sanity', label: '精神', className: 'n-mind' },
 ];
 
 const bodyMeta: Array<{ key: Extract<StatKey, 'health' | 'fatigue'>; label: string }> = [
   { key: 'health', label: '生命' },
-  { key: 'fatigue', label: '体力' },
+  { key: 'fatigue', label: '疲劳' },
 ];
 
 const weatherIcon: Record<EnvironmentState['weather'], string> = {
-  sunny: '晴',
-  rain: '雨',
-  storm: '暴',
+  sunny: '☀',
+  rain: '☔',
+  storm: '⛈',
 };
 
 const phaseLabel = {
@@ -48,15 +46,6 @@ const cardTypeLabel = {
   resource: '资源',
   recipe: '配方',
   event: '事件',
-  skill: '技能',
-} as const;
-
-const recipeCategoryLabel = {
-  building: '建筑',
-  food: '食物',
-  tool: '工具',
-  medical: '医疗',
-  goal: '目标',
   skill: '技能',
 } as const;
 
@@ -109,7 +98,11 @@ function App() {
     isPrototypeGoalComplete(goal, player, progress),
   ).length;
   const energyPips = useMemo(
-    () => Array.from({ length: environment.actionLimit }, (_, index) => index < environment.actionsRemaining),
+    () =>
+      Array.from(
+        { length: environment.actionLimit },
+        (_, index) => index < environment.actionsRemaining,
+      ),
     [environment.actionLimit, environment.actionsRemaining],
   );
   const firstEmptyWorkbenchSlot =
@@ -208,10 +201,13 @@ function App() {
               <span>{weatherLabel[environment.weather]}</span>
             </div>
             <button type="button" className="btn-journal" onClick={() => setJournalOpen(true)}>
-              求生日记
+              日记
+            </button>
+            <button type="button" className="btn-journal" onClick={resetGame}>
+              重开
             </button>
             <button type="button" className="btn-end-day" onClick={nextTurn}>
-              结束阶段
+              推进阶段
             </button>
           </div>
         </header>
@@ -256,9 +252,10 @@ function App() {
 
           <div className="left-note">
             <strong>今日目标</strong>
-            <p>{activeGoal?.title ?? '已经走到原型终局'}</p>
-            <span>
-              {activeGoal?.description ?? '第七天结束后将根据营地准备情况给出结局。'}
+            <p>{activeGoal?.title ?? '已经抵达 7 天原型终局'}</p>
+            <span>{activeGoal?.description ?? '第七天夜晚结束后会根据营地准备情况结算。'}</span>
+            <span className="goal-progress">
+              完成度 {completedGoalCount} / {allPrototypeGoals.length}
             </span>
           </div>
         </aside>
@@ -288,7 +285,7 @@ function App() {
               </div>
             )}
             <div className="terrain-label">{terrainLabel[environment.terrain]}</div>
-            {activeEvent && <div className="event-banner">危机正在逼近：{activeEvent.title}</div>}
+            {activeEvent && <div className="event-banner">危机逼近：{activeEvent.title}</div>}
           </div>
 
           <div className="card-workspace">
@@ -296,7 +293,7 @@ function App() {
               <div>
                 <div className="workspace-title">堆叠合成工作台</div>
                 <div className="workspace-subtitle">
-                  把材料拖进同一个区域，像翻动一页湿透的生存笔记那样慢慢拼出营地。
+                  把材料拖进同一片区域，像翻动一页潮湿日记那样，慢慢拼出营地和求生工具。
                 </div>
               </div>
               <button type="button" className="btn-subtle" onClick={storeAllWorkbenchItems}>
@@ -305,7 +302,7 @@ function App() {
             </div>
 
             <div className={`drop-zone ${dragSource ? 'active' : ''}`}>
-              {dragSource ? '松手放入叠放区' : '把资源拖到这里进行叠放'}
+              {dragSource ? '松手放入叠放区' : '拖拽物品到这里进行堆叠合成'}
             </div>
 
             <div className="workspace-board">
@@ -340,9 +337,9 @@ function App() {
               })}
               {!workbench.some((slot) => slot.itemId) && (
                 <div className="workspace-hint">
-                  荒野里没有面板，只有你手里能摆出来的东西。
+                  荒野里没有菜单，只有你手里摆出来的东西。
                   <br />
-                  从背包里拖材料上来试试。
+                  从右侧背包拖材料上来试试。
                 </div>
               )}
             </div>
@@ -381,9 +378,9 @@ function App() {
                   </>
                 ) : (
                   <>
-                    <div className="recipe-line">还没形成可识别组合。</div>
+                    <div className="recipe-line">暂时还没有形成可识别的组合。</div>
                     <div className="recipe-line subtle">
-                      常见做法：木材 + 木材 + 燧石，或棕榈叶 + 藤蔓。
+                      试试木材 + 木材 + 燧石，或者棕榈叶 + 藤蔓。
                     </div>
                   </>
                 )}
@@ -437,8 +434,8 @@ function App() {
                     <h3>{selectedWorkbenchItem.name}</h3>
                     <p>{selectedWorkbenchItem.description}</p>
                     <div className="paper-meta">
-                      <span>工作台位 W{selectedWorkbenchSlotData.slotIndex + 1}</span>
-                      <span>等待继续叠放</span>
+                      <span>工作位 W{selectedWorkbenchSlotData.slotIndex + 1}</span>
+                      <span>继续叠放可尝试配方</span>
                     </div>
                     <div className="paper-actions">
                       <button
@@ -453,8 +450,8 @@ function App() {
                 ) : (
                   <>
                     <div className="paper-kicker">工作札记</div>
-                    <h3>从卡开始摆</h3>
-                    <p>选中背包里的物品可以直接放上工作台，也可以拖拽到中央叠放区。</p>
+                    <h3>从卡牌开始摆</h3>
+                    <p>选中右侧背包里的物品可以直接放上工作台，也可以拖拽到中央叠放区。</p>
                   </>
                 )}
               </div>
@@ -464,7 +461,7 @@ function App() {
 
         <aside className="panel-info">
           <div className="info-section">
-            <div className="info-head">地形区域</div>
+            <div className="info-head">地形</div>
             {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
               <button
                 key={terrain}
@@ -480,7 +477,7 @@ function App() {
           </div>
 
           <div className="info-section">
-            <div className="info-head">身体状态</div>
+            <div className="info-head">身体</div>
             <div className="body-grid">
               {bodyMeta.map((entry) => (
                 <div key={entry.key} className="body-chip">
@@ -492,34 +489,45 @@ function App() {
           </div>
 
           <div className="info-section">
-            <div className="info-head">求生目标</div>
-            <div className="goal-paper">
-              <strong>{activeGoal?.title ?? '终局已触发'}</strong>
-              <p>
-                {activeGoal?.description ?? '接下来只需要看营地准备是否足够，让结局自己发生。'}
-              </p>
-              <span>
-                已完成 {completedGoalCount} / {allPrototypeGoals.length}
-              </span>
-            </div>
-          </div>
-
-          <div className="info-section">
-            <div className="info-head">已知配方</div>
-            <div className="recipe-scroll">
-              {allCraftingRecipes.map((recipe) => (
-                <div key={recipe.id} className="recipe-mini">
-                  <strong>{recipe.name}</strong>
-                  <p>{recipe.category ? recipeCategoryLabel[recipe.category] : '配方'}</p>
-                </div>
-              ))}
+            <div className="info-head">背包</div>
+            <div className="backpack-grid">
+              {backpack.map((slot) => {
+                const item = getItemDefinition(slot.itemId);
+                return (
+                  <button
+                    key={slot.slotIndex}
+                    type="button"
+                    draggable={!!item}
+                    className={`backpack-slot ${item ? 'filled' : ''} ${
+                      selectedBackpackSlot === slot.slotIndex ? 'selected' : ''
+                    }`}
+                    onClick={() => handleBackpackClick(slot)}
+                    onDragStart={() =>
+                      item && setDragSource({ kind: 'backpack', index: slot.slotIndex })
+                    }
+                    onDragEnd={() => setDragSource(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => handleBackpackDrop(slot.slotIndex)}
+                  >
+                    <span className="slot-index">{slot.slotIndex + 1}</span>
+                    {item ? (
+                      <>
+                        <span className="slot-icon">{item.icon}</span>
+                        <span className="slot-amount">x{slot.amount}</span>
+                      </>
+                    ) : (
+                      <span className="slot-empty">空</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div className="info-section">
             <div className="info-head">最近记录</div>
             <div className="log-stack">
-              {logs.slice(0, 6).map((log, index) => (
+              {logs.slice(0, 4).map((log, index) => (
                 <div key={log.id} className={`log-entry ${index === 0 ? 'fresh' : ''}`}>
                   <span className="log-day">D{environment.day}</span>
                   {log.text}
@@ -530,7 +538,10 @@ function App() {
         </aside>
 
         <section className="panel-hand">
-          <div className="hand-label">当前手牌</div>
+          <div className="hand-head">
+            <div className="hand-label">当前手牌</div>
+            <div className="hand-count">{hand.length} 张</div>
+          </div>
           {hand.map((card) => {
             const actionCost = card.actionCost ?? 1;
             const disabled =
@@ -550,18 +561,6 @@ function App() {
               </div>
             );
           })}
-
-          <div className="action-row">
-            <button type="button" className="btn-end-day" onClick={nextTurn}>
-              结束今天
-            </button>
-            <button type="button" className="btn-journal" onClick={() => setJournalOpen(true)}>
-              打开日记
-            </button>
-            <button type="button" className="btn-journal" onClick={resetGame}>
-              重开原型
-            </button>
-          </div>
         </section>
       </main>
 
@@ -572,7 +571,7 @@ function App() {
         <div className="journal-book" onClick={(event) => event.stopPropagation()}>
           <div className="journal-header">
             <div className="journal-title">求生日记</div>
-            <div className="journal-sub">那些真正熬过去的夜晚，都会留下字迹</div>
+            <div className="journal-sub">那些真正熬过去的夜晚，最后都会留下字迹。</div>
             <button type="button" className="journal-close" onClick={() => setJournalOpen(false)}>
               合上
             </button>
@@ -592,9 +591,9 @@ function App() {
               ))
             ) : (
               <div className="journal-page">
-                <div className="je-day">尚未记下任何一页</div>
+                <div className="je-day">还没有写下第一页</div>
                 <div className="je-text">
-                  还没有走到第一个夜晚。等天色真正暗下来，系统会自动替你写下当天最尖锐的感受。
+                  先撑过今晚吧。到了真正的夜里，系统会把今天最尖锐的情绪写进纸页里。
                 </div>
               </div>
             )}
@@ -609,7 +608,7 @@ function App() {
               <div className="crisis-icon">危</div>
               <div>
                 <div className="crisis-name">{activeEvent.title}</div>
-                <div className="crisis-tag">危机事件 · 必须处理</div>
+                <div className="crisis-tag">危机事件 · 必须先处理</div>
               </div>
             </div>
             <div className="crisis-body">
@@ -643,26 +642,26 @@ function getNeedStatus(
   value: number,
 ) {
   if (key === 'hunger') {
-    if (value < 25) return { text: '危险 · 明早必须找食物', level: 'crit' };
-    if (value < 50) return { text: '偏低 · 今日别再硬撑', level: 'warn' };
-    return { text: '尚可 · 还能继续行动', level: '' };
+    if (value < 25) return { text: '危险 · 明早必须找吃的', level: 'crit' };
+    if (value < 50) return { text: '偏低 · 今天别再硬撑', level: 'warn' };
+    return { text: '尚可 · 还撑得住', level: '' };
   }
 
   if (key === 'thirst') {
     if (value < 25) return { text: '危险 · 身体已经开始报警', level: 'crit' };
     if (value < 45) return { text: '偏低 · 优先补水', level: 'warn' };
-    return { text: '正常 · 还没到发干的时候', level: '' };
+    return { text: '正常 · 还能继续找资源', level: '' };
   }
 
   if (key === 'temperature') {
-    if (value < 30) return { text: '危险 · 失温边缘', level: 'crit' };
-    if (value < 50) return { text: '偏低 · 黄昏前要准备火', level: 'warn' };
+    if (value < 30) return { text: '危险 · 已经接近失温', level: 'crit' };
+    if (value < 50) return { text: '偏低 · 黄昏前最好生火', level: 'warn' };
     return { text: '正常 · 风还扛得住', level: '' };
   }
 
   if (value < 30) return { text: '危险 · 不要一个人想太久', level: 'crit' };
   if (value < 50) return { text: '波动 · 夜里容易崩', level: 'warn' };
-  return { text: '稳定 · 心还撑得住', level: '' };
+  return { text: '稳定 · 还没有乱掉', level: '' };
 }
 
 export default App;

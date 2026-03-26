@@ -28,6 +28,14 @@ const statMeta: Record<
 
 const primaryStats: StatKey[] = ['hunger', 'health', 'sanity'];
 const secondaryStats: StatKey[] = ['thirst', 'temperature', 'fatigue'];
+const recipeCategoryLabel = {
+  building: '建筑',
+  food: '食物',
+  tool: '工具',
+  medical: '医疗',
+  goal: '目标',
+  skill: '技能',
+} as const;
 
 function App() {
   const {
@@ -550,6 +558,19 @@ function App() {
                               )
                               .join(' + ')}
                           </span>
+                          {recipe.preserves && recipe.preserves.length > 0 && (
+                            <span>
+                              保留：
+                              {recipe.preserves
+                                .map(
+                                  (entry) =>
+                                    `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${
+                                      entry.amount
+                                    }`,
+                                )
+                                .join(' + ')}
+                            </span>
+                          )}
                           <span>
                             产出：
                             {recipe.produces
@@ -561,6 +582,9 @@ function App() {
                               )
                               .join(' + ')}
                           </span>
+                          {recipe.category && (
+                            <span>类型：{recipeCategoryLabel[recipe.category]}</span>
+                          )}
                         </div>
                       </div>
                       <span className="recipe-state">

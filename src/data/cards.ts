@@ -9,7 +9,10 @@ export const starterDeck: CardDefinition[] = [
     description: '在附近搜寻可食用浆果，补充食物并带回一些存货。',
     effect: {
       statChanges: { hunger: 8, fatigue: -6, sanity: 2 },
-      gainItems: [{ itemId: 'berries', amount: 2 }],
+      gainItems: [
+        { itemId: 'berries', amount: 2 },
+        { itemId: 'palm-leaf', amount: 1 },
+      ],
     },
     condition: {
       allowedTerrains: ['beach', 'jungle'],
@@ -39,7 +42,10 @@ export const starterDeck: CardDefinition[] = [
     description: '在海滩尝试捕鱼，成功的话能把鲜鱼带回背包。',
     effect: {
       statChanges: { fatigue: -10 },
-      gainItems: [{ itemId: 'raw-fish', amount: 1 }],
+      gainItems: [
+        { itemId: 'raw-fish', amount: 1 },
+        { itemId: 'driftwood', amount: 1 },
+      ],
     },
     condition: {
       allowedTerrains: ['beach'],
@@ -67,7 +73,10 @@ export const starterDeck: CardDefinition[] = [
     description: '临时庇护所让你更安全，也会留下些可重复利用的材料。',
     effect: {
       statChanges: { sanity: 8, fatigue: -8, health: 4 },
-      gainItems: [{ itemId: 'palm-fiber', amount: 2 }],
+      gainItems: [
+        { itemId: 'palm-leaf', amount: 2 },
+        { itemId: 'vine', amount: 1 },
+      ],
     },
     condition: {
       allowedTerrains: ['beach', 'jungle'],
@@ -85,7 +94,12 @@ export const starterDeck: CardDefinition[] = [
       moveTerrain: 'jungle',
       drawCards: 1,
       eventChanceBonus: 0.15,
-      gainItems: [{ itemId: 'herb-bundle', amount: 1 }],
+      gainItems: [
+        { itemId: 'herb', amount: 2 },
+        { itemId: 'vine', amount: 1 },
+        { itemId: 'bamboo', amount: 1 },
+        { itemId: 'beast-hide', amount: 1 },
+      ],
     },
     condition: {
       allowedTerrains: ['beach'],
@@ -102,6 +116,10 @@ export const starterDeck: CardDefinition[] = [
       statChanges: { sanity: -4, temperature: 10 },
       moveTerrain: 'cave',
       eventChanceBonus: 0.1,
+      gainItems: [
+        { itemId: 'flint', amount: 2 },
+        { itemId: 'stone', amount: 1 },
+      ],
     },
   },
   {
@@ -116,6 +134,20 @@ export const starterDeck: CardDefinition[] = [
     },
     condition: {
       allowedTime: ['dusk', 'night'],
+    },
+  },
+  {
+    id: 'write-journal',
+    name: '写日记',
+    type: 'skill',
+    actionCost: 0,
+    description: '把这一天真正写下来。文字不能喂饱你，但能帮你熬过很多夜晚。',
+    effect: {
+      statChanges: { sanity: 15 },
+      gainItems: [{ itemId: 'journal-page', amount: 1 }],
+    },
+    condition: {
+      allowedTime: ['night'],
     },
   },
   {
@@ -141,7 +173,10 @@ export const starterDeck: CardDefinition[] = [
     effect: {
       statChanges: { sanity: 5, fatigue: -6 },
       drawCards: 1,
-      gainItems: [{ itemId: 'spear', amount: 1 }],
+      gainItems: [
+        { itemId: 'spear', amount: 1 },
+        { itemId: 'driftwood', amount: 1 },
+      ],
     },
     condition: {
       allowedTerrains: ['beach', 'jungle'],

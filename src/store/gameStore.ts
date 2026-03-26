@@ -425,42 +425,137 @@ const swapBackpackSlots = (backpack: BackpackSlot[], fromIndex: number, toIndex:
 
 const craftingRecipes: CraftingRecipe[] = [
   {
-    id: 'fiber-rope',
-    name: '编制纤维绳',
-    description: '把棕榈纤维搓成更牢固的绳索，便于后续制作工具。',
-    requires: [{ itemId: 'palm-fiber', amount: 2 }],
-    produces: [{ itemId: 'campfire-kit', amount: 1 }],
+    id: 'campfire',
+    name: '篝火',
+    description: '木材与燧石在工作台上堆出一个稳定火源，夜里终于有了真正的中心。',
+    requires: [
+      { itemId: 'driftwood', amount: 2 },
+      { itemId: 'flint', amount: 1 },
+    ],
+    produces: [{ itemId: 'campfire', amount: 1 }],
+    category: 'building',
   },
   {
-    id: 'field-medicine',
-    name: '应急草药包',
-    description: '用浆果和纤维打包成简易治疗包。',
+    id: 'grilled-fish',
+    name: '烤鱼',
+    description: '把鲜鱼贴着篝火烤熟，火会留下，鱼会变成真正能撑人的热食。',
     requires: [
-      { itemId: 'berries', amount: 2 },
-      { itemId: 'palm-fiber', amount: 1 },
+      { itemId: 'raw-fish', amount: 1 },
+      { itemId: 'campfire', amount: 1 },
     ],
-    produces: [{ itemId: 'herb-bundle', amount: 1 }],
+    preserves: [{ itemId: 'campfire', amount: 1 }],
+    produces: [{ itemId: 'cooked-fish', amount: 1 }],
+    category: 'food',
   },
   {
-    id: 'fire-starter-pack',
-    name: '野外引火包',
-    description: '拆分木矛与纤维做成多份引火材料，便于夜间续火。',
+    id: 'temporary-shelter',
+    name: '临时庇护所',
+    description: '棕榈叶和藤蔓叠在一起，很自然就长成了一顶挡风避雨的小 shelter。',
     requires: [
-      { itemId: 'spear', amount: 1 },
-      { itemId: 'palm-fiber', amount: 2 },
+      { itemId: 'palm-leaf', amount: 3 },
+      { itemId: 'vine', amount: 2 },
     ],
-    produces: [{ itemId: 'campfire-kit', amount: 2 }],
+    produces: [{ itemId: 'temporary-shelter', amount: 1 }],
+    category: 'building',
+  },
+  {
+    id: 'flint-knife',
+    name: '燧石刀',
+    description: '尖石加上藤蔓固定，很快就能做出第一把像样的切割工具。',
+    requires: [
+      { itemId: 'flint', amount: 2 },
+      { itemId: 'vine', amount: 1 },
+    ],
+    produces: [{ itemId: 'flint-knife', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'herb-salve',
+    name: '草药药膏',
+    description: '草药和净水揉在一起，做出的药膏终于能真正处理那些拖人的小伤。',
+    requires: [
+      { itemId: 'herb', amount: 2 },
+      { itemId: 'fresh-water', amount: 1 },
+    ],
+    produces: [{ itemId: 'herb-salve', amount: 1 }],
+    category: 'medical',
+  },
+  {
+    id: 'water-collector',
+    name: '集水装置',
+    description: '竹节撑起棕榈叶之后，营地开始拥有第一件会自己工作的东西。',
+    requires: [
+      { itemId: 'bamboo', amount: 1 },
+      { itemId: 'palm-leaf', amount: 2 },
+    ],
+    produces: [{ itemId: 'water-collector', amount: 1 }],
+    category: 'building',
+  },
+  {
+    id: 'simple-trap',
+    name: '简易陷阱',
+    description: '一根木材加几段藤蔓，已经足够搭出一个能赌运气的小机关。',
+    requires: [
+      { itemId: 'driftwood', amount: 1 },
+      { itemId: 'vine', amount: 2 },
+    ],
+    produces: [{ itemId: 'simple-trap', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'waterproof-wrap',
+    name: '防水包裹',
+    description: '把棕榈叶和藤蔓反复包扎，关键物资终于不再一淋就完蛋。',
+    requires: [
+      { itemId: 'palm-leaf', amount: 1 },
+      { itemId: 'vine', amount: 1 },
+    ],
+    produces: [{ itemId: 'waterproof-wrap', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'clean-container',
+    name: '净水容器',
+    description: '竹节和石块叠出一个粗糙但好用的容器，净化水源终于有了像样工具。',
+    requires: [
+      { itemId: 'bamboo', amount: 2 },
+      { itemId: 'stone', amount: 1 },
+    ],
+    produces: [{ itemId: 'clean-container', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'dried-meat',
+    name: '肉干',
+    description: '把多余的鱼肉借着篝火慢慢风干，得到一份能多撑几天的高价值食物。',
+    requires: [
+      { itemId: 'raw-fish', amount: 2 },
+      { itemId: 'campfire', amount: 1 },
+    ],
+    preserves: [{ itemId: 'campfire', amount: 1 }],
+    produces: [{ itemId: 'dried-meat', amount: 1 }],
+    category: 'food',
   },
   {
     id: 'signal-beacon',
-    name: '求救信标',
-    description: '将木矛、火种和纤维绑成显眼的求救信标，等待远处船只发现。',
+    name: '信号篝火',
+    description: '篝火和兽皮叠成了巨大而显眼的信号装置，这是第七天最重要的一步。',
     requires: [
+      { itemId: 'campfire', amount: 1 },
       { itemId: 'spear', amount: 1 },
-      { itemId: 'campfire-kit', amount: 1 },
-      { itemId: 'palm-fiber', amount: 3 },
+      { itemId: 'beast-hide', amount: 1 },
     ],
+    preserves: [{ itemId: 'campfire', amount: 1 }],
     produces: [{ itemId: 'signal-beacon', amount: 1 }],
+    category: 'goal',
+  },
+  {
+    id: 'spirit-totem',
+    name: '精神支柱',
+    description: '把三页日记叠在一起之后，它们不再只是文字，而成了撑住你的理由。',
+    requires: [{ itemId: 'journal-page', amount: 3 }],
+    produces: [{ itemId: 'spirit-totem', amount: 1 }],
+    category: 'skill',
   },
 ];
 
@@ -577,6 +672,8 @@ const createInitialState = () => {
   const seeded = addItemsToBackpack(createInitialBackpack(), [
     { itemId: 'berries', amount: 1 },
     { itemId: 'fresh-water', amount: 1 },
+    { itemId: 'driftwood', amount: 1 },
+    { itemId: 'palm-leaf', amount: 1 },
   ]).backpack;
 
   return {
@@ -606,6 +703,9 @@ const updateProgressFromAction = (
   jungleExplored: progress.jungleExplored || cardId === 'explore-jungle',
   caveExplored: progress.caveExplored || cardId === 'enter-cave',
   lastActionSummary: actionSummary,
+  campfireCrafted:
+    progress.campfireCrafted ||
+    gains.some((entry) => entry.itemId === 'campfire'),
   spearCrafted:
     progress.spearCrafted ||
     cardId === 'craft-spear' ||
@@ -1233,7 +1333,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...state.progress,
       campfireCrafted:
         state.progress.campfireCrafted ||
-        recipe.produces.some((entry) => entry.itemId === 'campfire-kit'),
+        recipe.produces.some((entry) => entry.itemId === 'campfire'),
+      shelterBuilt:
+        state.progress.shelterBuilt ||
+        recipe.produces.some((entry) => entry.itemId === 'temporary-shelter'),
       beaconCrafted:
         state.progress.beaconCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),
@@ -1271,8 +1374,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const emptiedWorkbench = createInitialWorkbench();
-    const producedOnWorkbench = addItemsToWorkbench(emptiedWorkbench, recipe.produces);
-    const overflowToBackpack = addItemsToBackpack(state.backpack, producedOnWorkbench.overflow);
+    const preservedOnWorkbench = addItemsToWorkbench(
+      emptiedWorkbench,
+      recipe.preserves ?? [],
+    );
+    const producedOnWorkbench = addItemsToWorkbench(
+      preservedOnWorkbench.workbench,
+      recipe.produces,
+    );
+    const overflowToBackpack = addItemsToBackpack(state.backpack, [
+      ...preservedOnWorkbench.overflow,
+      ...producedOnWorkbench.overflow,
+    ]);
     const outputText = recipe.produces
       .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
       .join('、');
@@ -1284,7 +1397,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...state.progress,
       campfireCrafted:
         state.progress.campfireCrafted ||
-        recipe.produces.some((entry) => entry.itemId === 'campfire-kit'),
+        recipe.produces.some((entry) => entry.itemId === 'campfire'),
+      shelterBuilt:
+        state.progress.shelterBuilt ||
+        recipe.produces.some((entry) => entry.itemId === 'temporary-shelter'),
       beaconCrafted:
         state.progress.beaconCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),

@@ -75,7 +75,9 @@ export interface CraftingRecipe {
   name: string;
   description: string;
   requires: ItemStackChange[];
+  preserves?: ItemStackChange[];
   produces: ItemStackChange[];
+  category?: 'building' | 'food' | 'tool' | 'medical' | 'goal' | 'skill';
 }
 
 export interface CardEffect {

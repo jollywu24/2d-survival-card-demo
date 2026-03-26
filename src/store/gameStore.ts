@@ -35,6 +35,7 @@ interface GameState {
   logs: LogEntry[];
   useCard: (cardId: string) => void;
   resolveEvent: (optionId: string) => void;
+  setTerrain: (terrain: EnvironmentState['terrain']) => void;
   selectBackpackSlot: (slotIndex: number) => void;
   selectWorkbenchSlot: (slotIndex: number) => void;
   moveSelectedToSlot: (slotIndex: number) => void;
@@ -1009,6 +1010,29 @@ export const useGameStore = create<GameState>((set, get) => ({
         createLog(`【${event.title}】${option.resultText}`),
         ...current.logs,
       ].slice(0, 10),
+    }));
+  },
+
+  setTerrain: (terrain) => {
+    const state = get();
+    if (state.ending || state.activeEvent) {
+      return;
+    }
+
+    if (state.environment.terrain === terrain) {
+      return;
+    }
+
+    set((current) => ({
+      environment: {
+        ...current.environment,
+        terrain,
+      },
+      progress: {
+        ...current.progress,
+        lastActionSummary: `我把今天的注意力转向了${terrainLabel[terrain]}。`,
+      },
+      logs: [createLog(`你转向了${terrainLabel[terrain]}。`), ...current.logs].slice(0, 10),
     }));
   },
 

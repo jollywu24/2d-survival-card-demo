@@ -2,6 +2,25 @@
 
 export const starterDeck: CardDefinition[] = [
   {
+    id: 'beachcombing',
+    name: '随便逛逛',
+    type: 'action',
+    actionCost: 1,
+    description: '沿着海滩低头慢走，把最容易忽略的小东西翻到工作台上。',
+    effect: {
+      statChanges: { fatigue: -4, sanity: 1 },
+      eventChanceBonus: -0.3,
+      gainWorkbenchItems: [
+        { itemId: 'pebble', amount: 2 },
+        { itemId: 'green-coconut', amount: 1 },
+      ],
+    },
+    condition: {
+      allowedTerrains: ['beach'],
+      allowedTime: ['day'],
+    },
+  },
+  {
     id: 'gather-berries',
     name: '采集浆果',
     type: 'action',

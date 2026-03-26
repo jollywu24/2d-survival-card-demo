@@ -49,6 +49,14 @@ const cardTypeLabel = {
   skill: '技能',
 } as const;
 
+const itemTypeLabel = {
+  material: '材料',
+  tool: '工具',
+  food: '食物',
+  water: '饮水',
+  medical: '药品',
+} as const;
+
 function App() {
   const {
     player,
@@ -74,6 +82,7 @@ function App() {
     moveWorkbenchItem,
     storeAllWorkbenchItems,
     useBackpackItem,
+    useWorkbenchItem,
     discardBackpackItem,
     craftWorkbenchRecipe,
     useCard,
@@ -109,7 +118,7 @@ function App() {
     workbench.find((slot) => slot.itemId === null)?.slotIndex ?? -1;
 
   useEffect(() => {
-    if (!workbenchRecipe || activeEvent || ending || environment.actionsRemaining < 1) {
+    if (!workbenchRecipe || activeEvent || ending) {
       return;
     }
 
@@ -178,6 +187,44 @@ function App() {
     }
 
     setDragSource(null);
+  };
+
+  const renderItemCard = (slot: BackpackSlot, kind: 'backpack' | 'workbench') => {
+    const item = getItemDefinition(slot.itemId);
+    const selected =
+      kind === 'backpack'
+        ? selectedBackpackSlot === slot.slotIndex
+        : selectedWorkbenchSlot === slot.slotIndex;
+
+    return (
+      <button
+        key={`${kind}-${slot.slotIndex}`}
+        type="button"
+        draggable={!!item}
+        className={`item-card ${kind === 'workbench' ? `work-card slot-${slot.slotIndex}` : 'backpack-card'} ${
+          selected ? 'selected' : ''
+        } ${item ? 'filled' : ''}`}
+        onClick={() => (kind === 'backpack' ? handleBackpackClick(slot) : handleWorkbenchClick(slot))}
+        onDragStart={() => item && setDragSource({ kind, index: slot.slotIndex })}
+        onDragEnd={() => setDragSource(null)}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={() =>
+          kind === 'backpack' ? handleBackpackDrop(slot.slotIndex) : handleWorkbenchDrop(slot.slotIndex)
+        }
+      >
+        <span className="slot-index">{kind === 'backpack' ? `B${slot.slotIndex + 1}` : `W${slot.slotIndex + 1}`}</span>
+        {item ? (
+          <>
+            <span className="item-card-icon">{item.icon}</span>
+            <span className="item-card-name">{item.name}</span>
+            <span className="item-card-type">{itemTypeLabel[item.type]}</span>
+            {slot.amount > 1 && <span className="slot-amount">x{slot.amount}</span>}
+          </>
+        ) : (
+          <span className="item-card-empty">{kind === 'backpack' ? '空卡位' : '空叠放位'}</span>
+        )}
+      </button>
+    );
   };
 
   return (
@@ -306,35 +353,7 @@ function App() {
             </div>
 
             <div className="workspace-board">
-              {workbench.map((slot) => {
-                const item = getItemDefinition(slot.itemId);
-                return (
-                  <button
-                    key={slot.slotIndex}
-                    type="button"
-                    draggable={!!item}
-                    className={`work-card slot-${slot.slotIndex} ${
-                      selectedWorkbenchSlot === slot.slotIndex ? 'selected' : ''
-                    } ${item ? 'filled' : ''}`}
-                    onClick={() => handleWorkbenchClick(slot)}
-                    onDragStart={() =>
-                      item && setDragSource({ kind: 'workbench', index: slot.slotIndex })
-                    }
-                    onDragEnd={() => setDragSource(null)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => handleWorkbenchDrop(slot.slotIndex)}
-                  >
-                    {item ? (
-                      <>
-                        <span className="work-card-icon">{item.icon}</span>
-                        <span className="work-card-name">{item.name}</span>
-                      </>
-                    ) : (
-                      <span className="work-card-empty">空位</span>
-                    )}
-                  </button>
-                );
-              })}
+              {workbench.map((slot) => renderItemCard(slot, 'workbench'))}
               {!workbench.some((slot) => slot.itemId) && (
                 <div className="workspace-hint">
                   荒野里没有菜单，只有你手里摆出来的东西。
@@ -380,7 +399,7 @@ function App() {
                   <>
                     <div className="recipe-line">暂时还没有形成可识别的组合。</div>
                     <div className="recipe-line subtle">
-                      试试木材 + 木材 + 燧石，或者棕榈叶 + 藤蔓。
+                      海滩最短链：小石子 + 小石子，或者石刀 + 青椰子。
                     </div>
                   </>
                 )}
@@ -394,17 +413,19 @@ function App() {
                     <p>{selectedBackpackItem.description}</p>
                     <div className="paper-meta">
                       <span>数量 x{selectedBackpackSlotData.amount}</span>
-                      <span>类型 {selectedBackpackItem.type}</span>
+                      <span>类型 {itemTypeLabel[selectedBackpackItem.type]}</span>
                     </div>
                     <div className="paper-actions">
-                      <button
-                        type="button"
-                        className="btn-paper"
-                        disabled={!!activeEvent || environment.actionsRemaining < 1 || !!ending}
-                        onClick={() => useBackpackItem(selectedBackpackSlotData.slotIndex)}
-                      >
-                        使用
-                      </button>
+                      {selectedBackpackItem.effect && (
+                        <button
+                          type="button"
+                          className="btn-paper"
+                          disabled={!!activeEvent || !!ending}
+                          onClick={() => useBackpackItem(selectedBackpackSlotData.slotIndex)}
+                        >
+                          使用
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn-paper secondary-ink"
@@ -438,6 +459,16 @@ function App() {
                       <span>继续叠放可尝试配方</span>
                     </div>
                     <div className="paper-actions">
+                      {selectedWorkbenchItem.effect && (
+                        <button
+                          type="button"
+                          className="btn-paper"
+                          disabled={!!activeEvent || !!ending}
+                          onClick={() => useWorkbenchItem(selectedWorkbenchSlotData.slotIndex)}
+                        >
+                          直接使用
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn-paper secondary-ink"
@@ -491,36 +522,7 @@ function App() {
           <div className="info-section">
             <div className="info-head">背包</div>
             <div className="backpack-grid">
-              {backpack.map((slot) => {
-                const item = getItemDefinition(slot.itemId);
-                return (
-                  <button
-                    key={slot.slotIndex}
-                    type="button"
-                    draggable={!!item}
-                    className={`backpack-slot ${item ? 'filled' : ''} ${
-                      selectedBackpackSlot === slot.slotIndex ? 'selected' : ''
-                    }`}
-                    onClick={() => handleBackpackClick(slot)}
-                    onDragStart={() =>
-                      item && setDragSource({ kind: 'backpack', index: slot.slotIndex })
-                    }
-                    onDragEnd={() => setDragSource(null)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => handleBackpackDrop(slot.slotIndex)}
-                  >
-                    <span className="slot-index">{slot.slotIndex + 1}</span>
-                    {item ? (
-                      <>
-                        <span className="slot-icon">{item.icon}</span>
-                        <span className="slot-amount">x{slot.amount}</span>
-                      </>
-                    ) : (
-                      <span className="slot-empty">空</span>
-                    )}
-                  </button>
-                );
-              })}
+              {backpack.map((slot) => renderItemCard(slot, 'backpack'))}
             </div>
           </div>
 

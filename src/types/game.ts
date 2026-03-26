@@ -88,6 +88,7 @@ export interface CardEffect {
   drawCards?: number;
   eventChanceBonus?: number;
   gainItems?: ItemStackChange[];
+  gainWorkbenchItems?: ItemStackChange[];
 }
 
 export interface CardCondition {
@@ -135,6 +136,7 @@ export interface ItemDefinition {
   description: string;
   effect?: CardEffect;
   maxStack: number;
+  useActionCost?: number;
 }
 
 export interface BackpackSlot {

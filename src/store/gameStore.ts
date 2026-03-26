@@ -44,6 +44,7 @@ interface GameState {
   moveWorkbenchItem: (fromWorkbenchIndex: number, toWorkbenchIndex: number) => void;
   storeAllWorkbenchItems: () => void;
   useBackpackItem: (slotIndex: number) => void;
+  useWorkbenchItem: (slotIndex: number) => void;
   discardBackpackItem: (slotIndex: number) => void;
   craftRecipe: (recipeId: string) => void;
   craftWorkbenchRecipe: () => void;
@@ -425,6 +426,61 @@ const swapBackpackSlots = (backpack: BackpackSlot[], fromIndex: number, toIndex:
 };
 
 const craftingRecipes: CraftingRecipe[] = [
+  {
+    id: 'stone-knife',
+    name: '石刀',
+    description: '把两块海滩小石子叠在一起，边缘磨出了一把最原始也最关键的石刀。',
+    requires: [
+      { itemId: 'pebble', amount: 2 },
+    ],
+    produces: [{ itemId: 'stone-knife', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'open-green-coconut',
+    name: '剖开青椰子',
+    description: '石刀切开青椰子后，先得到可继续处理的椰体和一片粗糙的椰子皮。',
+    requires: [
+      { itemId: 'stone-knife', amount: 1 },
+      { itemId: 'green-coconut', amount: 1 },
+    ],
+    preserves: [{ itemId: 'stone-knife', amount: 1 }],
+    produces: [
+      { itemId: 'opened-coconut', amount: 1 },
+      { itemId: 'coconut-husk', amount: 1 },
+    ],
+    category: 'food',
+  },
+  {
+    id: 'tap-coconut-water',
+    name: '放出椰子水',
+    description: '再切一刀，椰子水流了出来，剩下的椰体也变成了可以继续加工的带孔椰子。',
+    requires: [
+      { itemId: 'stone-knife', amount: 1 },
+      { itemId: 'opened-coconut', amount: 1 },
+    ],
+    preserves: [{ itemId: 'stone-knife', amount: 1 }],
+    produces: [
+      { itemId: 'coconut-water', amount: 1 },
+      { itemId: 'perforated-coconut', amount: 1 },
+    ],
+    category: 'food',
+  },
+  {
+    id: 'scrape-coconut',
+    name: '刮椰肉',
+    description: '石刀顺着带孔椰子的内壁刮下椰肉，同时保留下两只还能当碗用的椰壳。',
+    requires: [
+      { itemId: 'stone-knife', amount: 1 },
+      { itemId: 'perforated-coconut', amount: 1 },
+    ],
+    preserves: [{ itemId: 'stone-knife', amount: 1 }],
+    produces: [
+      { itemId: 'coconut-meat', amount: 1 },
+      { itemId: 'coconut-bowl', amount: 2 },
+    ],
+    category: 'food',
+  },
   {
     id: 'campfire',
     name: '篝火',
@@ -943,11 +999,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     const applied = applyEffect(state.player, state.environment, card.effect);
     const environmentAfterAction = spendActions(applied.environment, actionCost);
     const inventoryResult = addItemsToBackpack(state.backpack, card.effect.gainItems);
+    const workbenchResult = addItemsToWorkbench(state.workbench, card.effect.gainWorkbenchItems);
+    const overflowFromWorkbench = addItemsToBackpack(
+      inventoryResult.backpack,
+      workbenchResult.overflow,
+    );
     const nextProgress = updateProgressFromAction(
       state.progress,
       card.id,
       `${phaseSummaryLabel(state.environment.timeOfDay)}的主要精力花在了“${card.name}”上。`,
-      card.effect.gainItems,
+      [...(card.effect.gainItems ?? []), ...(card.effect.gainWorkbenchItems ?? [])],
     );
     const nextHandBase = state.hand.filter((item) => item.id !== card.id);
     const nextHand = rotateDeck(state.deck, nextHandBase, 1 + (card.effect.drawCards ?? 0));
@@ -961,18 +1022,27 @@ export const useGameStore = create<GameState>((set, get) => ({
             .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
             .join('、')}。`
         : '';
+    const workbenchGainText =
+      card.effect.gainWorkbenchItems && card.effect.gainWorkbenchItems.length > 0
+        ? ` 工作台翻出：${card.effect.gainWorkbenchItems
+            .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
+            .join('、')}。`
+        : '';
     const overflowText =
-      inventoryResult.overflow.length > 0 ? ` 背包已满，掉落：${inventoryResult.overflow.join('、')}。` : '';
+      [...inventoryResult.overflow, ...overflowFromWorkbench.overflow].length > 0
+        ? ` 背包已满，掉落：${[...inventoryResult.overflow, ...overflowFromWorkbench.overflow].join('、')}。`
+        : '';
 
     set((current) => ({
       player: applied.player,
       environment: environmentAfterAction,
       progress: nextProgress,
-      backpack: inventoryResult.backpack,
+      backpack: overflowFromWorkbench.backpack,
+      workbench: workbenchResult.workbench,
       hand: nextHand,
       activeEvent,
       logs: [
-        createLog(`你使用了【${card.name}】。${card.description}${itemGainText}${overflowText}`),
+        createLog(`你使用了【${card.name}】。${card.description}${itemGainText}${workbenchGainText}${overflowText}`),
         ...(activeEvent ? [createLog(`事件触发：${activeEvent.title}`)] : []),
         ...current.logs,
       ].slice(0, 10),
@@ -1262,7 +1332,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const actionCost = 1;
+    const actionCost =
+      item.useActionCost ?? (item.type === 'food' || item.type === 'water' ? 0 : 1);
     if (!canAffordAction(state.environment, actionCost)) {
       set((current) => ({
         logs: [
@@ -1275,7 +1346,16 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const applied = applyEffect(state.player, state.environment, item.effect);
     const environmentAfterAction = spendActions(applied.environment, actionCost);
-    const inventoryResult = addItemsToBackpack(consumeOneFromSlot(state.backpack, slotIndex), item.effect.gainItems);
+    const inventoryResult = addItemsToBackpack(
+      consumeOneFromSlot(state.backpack, slotIndex),
+      item.effect.gainItems,
+    );
+    const gainText =
+      item.effect.gainItems && item.effect.gainItems.length > 0
+        ? ` 并留下了 ${item.effect.gainItems
+            .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
+            .join('、')}。`
+        : '';
 
     set((current) => ({
       player: applied.player,
@@ -1286,7 +1366,68 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
       backpack: inventoryResult.backpack,
       selectedBackpackSlot: current.selectedBackpackSlot === slotIndex ? null : current.selectedBackpackSlot,
-      logs: [createLog(`你使用了背包物品【${item.name}】。`), ...current.logs].slice(0, 10),
+      logs: [createLog(`你使用了背包物品【${item.name}】。${gainText}`), ...current.logs].slice(0, 10),
+    }));
+  },
+
+  useWorkbenchItem: (slotIndex) => {
+    const state = get();
+    if (state.ending) {
+      return;
+    }
+    if (state.activeEvent) {
+      set((current) => ({
+        logs: [createLog('请先处理当前事件，再使用工作台上的物品。'), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+    const slot = state.workbench[slotIndex];
+    if (!slot || slot.itemId === null) {
+      return;
+    }
+
+    const item = itemById.get(slot.itemId);
+    if (!item?.effect) {
+      set((current) => ({
+        logs: [createLog(`【${item?.name ?? '未知物品'}】现在还不能直接从工作台使用。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+
+    const actionCost =
+      item.useActionCost ?? (item.type === 'food' || item.type === 'water' ? 0 : 1);
+    if (!canAffordAction(state.environment, actionCost)) {
+      set((current) => ({
+        logs: [
+          createLog(`本阶段行动次数不足，无法使用【${item.name}】。`),
+          ...current.logs,
+        ].slice(0, 10),
+      }));
+      return;
+    }
+
+    const applied = applyEffect(state.player, state.environment, item.effect);
+    const environmentAfterAction = spendActions(applied.environment, actionCost);
+    const removed = removeSingleUnitFromSlot(state.workbench, slotIndex);
+    const inventoryResult = addItemsToBackpack(state.backpack, item.effect.gainItems);
+    const gainText =
+      item.effect.gainItems && item.effect.gainItems.length > 0
+        ? ` 并留下了 ${item.effect.gainItems
+            .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
+            .join('、')}。`
+        : '';
+
+    set((current) => ({
+      player: applied.player,
+      environment: environmentAfterAction,
+      progress: {
+        ...current.progress,
+        lastActionSummary: `我直接在工作台上处理了${item.name}。`,
+      },
+      backpack: inventoryResult.backpack,
+      workbench: removed.slots,
+      selectedWorkbenchSlot: current.selectedWorkbenchSlot === slotIndex ? null : current.selectedWorkbenchSlot,
+      logs: [createLog(`你直接在工作台上使用了【${item.name}】。${gainText}`), ...current.logs].slice(0, 10),
     }));
   },
 
@@ -1389,7 +1530,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const actionCost = 1;
+    const actionCost = 0;
     if (!canAffordAction(state.environment, actionCost)) {
       set((current) => ({
         logs: [createLog(`本阶段行动次数不足，无法完成【${recipe.name}】叠放合成。`), ...current.logs].slice(0, 10),

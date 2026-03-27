@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
+﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { CardCanvas } from './components/CardCanvas';
 import {
   allPrototypeGoals,
@@ -57,11 +57,22 @@ const itemTypeLabel = {
   medical: '药品',
 } as const;
 
-const DEFAULT_WORKBENCH_DROP = { x: 170, y: 86 };
-const CARD_STACK_OFFSET_X = 10;
+const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
+const CARD_STACK_OFFSET_X = 12;
 const CARD_STACK_OFFSET_Y = 8;
-const WORKBENCH_CARD_WIDTH = 112;
-const WORKBENCH_CARD_HEIGHT = 78;
+const WORKBENCH_CARD_WIDTH = 120;
+const WORKBENCH_CARD_HEIGHT = 84;
+const STACK_HOLD_MS = 700;
+
+interface WorkbenchVisualCard {
+  id: string;
+  itemId: string;
+  stackId: string;
+  x: number;
+  y: number;
+  order: number;
+  sameItemCount: number;
+}
 
 function App() {
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -100,6 +111,10 @@ function App() {
     | { kind: 'workbench'; cardId: string }
     | null
   >(null);
+  const [stackHold, setStackHold] = useState<{ targetCardId: string; startedAt: number } | null>(
+    null,
+  );
+  const [stackProgress, setStackProgress] = useState(0);
 
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
@@ -115,6 +130,13 @@ function App() {
         ? workbench.filter((card) => card.stackId === selectedWorkbenchCard.stackId)
         : [],
     [selectedWorkbenchCard, workbench],
+  );
+  const selectedWorkbenchSameItemCount = useMemo(
+    () =>
+      selectedWorkbenchCard
+        ? selectedWorkbenchStack.filter((card) => card.itemId === selectedWorkbenchCard.itemId).length
+        : 0,
+    [selectedWorkbenchCard, selectedWorkbenchStack],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
   const activeGoal = allPrototypeGoals.find(
@@ -132,18 +154,107 @@ function App() {
     [environment.actionLimit, environment.actionsRemaining],
   );
 
-  const stackCardIndex = useMemo(() => {
-    const indexMap = new Map<string, number>();
-    const counters = new Map<string, number>();
+  const workbenchVisualCards = useMemo(() => {
+    const stackMap = new Map<string, WorkbenchCard[]>();
 
     workbench.forEach((card) => {
-      const index = counters.get(card.stackId) ?? 0;
-      indexMap.set(card.id, index);
-      counters.set(card.stackId, index + 1);
+      const cards = stackMap.get(card.stackId) ?? [];
+      cards.push(card);
+      stackMap.set(card.stackId, cards);
     });
 
-    return indexMap;
+    const visuals: WorkbenchVisualCard[] = [];
+
+    stackMap.forEach((cards, stackId) => {
+      const grouped = new Map<string, WorkbenchCard[]>();
+      cards.forEach((card) => {
+        const same = grouped.get(card.itemId) ?? [];
+        same.push(card);
+        grouped.set(card.itemId, same);
+      });
+
+      Array.from(grouped.entries()).forEach(([itemId, sameCards], order) => {
+        const representative = sameCards[0];
+        visuals.push({
+          id: representative.id,
+          itemId,
+          stackId,
+          x: representative.x,
+          y: representative.y,
+          order,
+          sameItemCount: sameCards.length,
+        });
+      });
+    });
+
+    return visuals.sort((left, right) => left.y - right.y || left.x - right.x || left.order - right.order);
   }, [workbench]);
+
+  const canStackOnCard = (targetCardId: string) => {
+    if (!dragSource) {
+      return false;
+    }
+
+    const targetCard = workbench.find((card) => card.id === targetCardId);
+    if (!targetCard) {
+      return false;
+    }
+
+    if (dragSource.kind === 'backpack') {
+      const slot = backpack[dragSource.slotIndex];
+      return !!slot?.itemId;
+    }
+
+    const sourceCard = workbench.find((card) => card.id === dragSource.cardId);
+    if (!sourceCard) {
+      return false;
+    }
+
+    return sourceCard.id !== targetCard.id && sourceCard.stackId !== targetCard.stackId;
+  };
+
+  useEffect(() => {
+    if (!dragSource || !stackHold || !canStackOnCard(stackHold.targetCardId)) {
+      if (stackProgress !== 0) {
+        setStackProgress(0);
+      }
+      return;
+    }
+
+    let frameId = 0;
+    let committed = false;
+
+    const tick = () => {
+      const progressValue = Math.min((performance.now() - stackHold.startedAt) / STACK_HOLD_MS, 1);
+      setStackProgress(progressValue);
+
+      if (progressValue >= 1 && !committed) {
+        committed = true;
+        if (dragSource.kind === 'backpack') {
+          moveBackpackToWorkbench(dragSource.slotIndex, undefined, stackHold.targetCardId);
+        } else {
+          moveWorkbenchStack(dragSource.cardId, undefined, stackHold.targetCardId);
+        }
+        setDragSource(null);
+        setStackHold(null);
+        setStackProgress(0);
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [dragSource, moveBackpackToWorkbench, moveWorkbenchStack, stackHold, stackProgress, workbench, backpack]);
+
+  const clearStackHold = () => {
+    setStackHold(null);
+    setStackProgress(0);
+  };
 
   const getBoardPoint = (event: DragEvent<HTMLElement>) => {
     const rect = boardRef.current?.getBoundingClientRect();
@@ -152,15 +263,31 @@ function App() {
     }
 
     const x = Math.max(
-      12,
-      Math.min(rect.width - WORKBENCH_CARD_WIDTH - 12, event.clientX - rect.left - 56),
+      16,
+      Math.min(rect.width - WORKBENCH_CARD_WIDTH - 16, event.clientX - rect.left - WORKBENCH_CARD_WIDTH / 2),
     );
     const y = Math.max(
-      12,
-      Math.min(rect.height - WORKBENCH_CARD_HEIGHT - 12, event.clientY - rect.top - 28),
+      16,
+      Math.min(rect.height - WORKBENCH_CARD_HEIGHT - 16, event.clientY - rect.top - 30),
     );
 
     return { x, y };
+  };
+
+  const beginStackHold = (targetCardId: string) => {
+    if (!canStackOnCard(targetCardId)) {
+      clearStackHold();
+      return;
+    }
+
+    setStackHold((current) =>
+      current?.targetCardId === targetCardId
+        ? current
+        : {
+            targetCardId,
+            startedAt: performance.now(),
+          },
+    );
   };
 
   const handleBackpackClick = (slot: BackpackSlot) => {
@@ -172,7 +299,7 @@ function App() {
     selectBackpackSlot(slot.slotIndex);
   };
 
-  const handleWorkbenchCardClick = (card: WorkbenchCard) => {
+  const handleWorkbenchCardClick = (card: WorkbenchVisualCard) => {
     if (selectedBackpackSlot !== null) {
       moveBackpackToWorkbench(selectedBackpackSlot, undefined, card.id);
       return;
@@ -187,6 +314,7 @@ function App() {
   };
 
   const handleBackpackDrop = (targetIndex: number) => {
+    clearStackHold();
     if (!dragSource) {
       return;
     }
@@ -200,6 +328,7 @@ function App() {
 
   const handleWorkbenchBoardDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    clearStackHold();
     if (!dragSource) {
       return;
     }
@@ -214,23 +343,10 @@ function App() {
     setDragSource(null);
   };
 
-  const handleWorkbenchCardDrop = (
-    event: DragEvent<HTMLButtonElement>,
-    targetCardId: string,
-  ) => {
+  const handleWorkbenchCardDrop = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-
-    if (!dragSource) {
-      return;
-    }
-
-    if (dragSource.kind === 'backpack') {
-      moveBackpackToWorkbench(dragSource.slotIndex, undefined, targetCardId);
-    } else if (dragSource.cardId !== targetCardId) {
-      moveWorkbenchStack(dragSource.cardId, undefined, targetCardId);
-    }
-
+    clearStackHold();
     setDragSource(null);
   };
 
@@ -245,8 +361,14 @@ function App() {
           selectedBackpackSlot === slot.slotIndex ? 'selected' : ''
         }`}
         onClick={() => handleBackpackClick(slot)}
-        onDragStart={() => item && setDragSource({ kind: 'backpack', slotIndex: slot.slotIndex })}
-        onDragEnd={() => setDragSource(null)}
+        onDragStart={() => {
+          clearStackHold();
+          item && setDragSource({ kind: 'backpack', slotIndex: slot.slotIndex });
+        }}
+        onDragEnd={() => {
+          clearStackHold();
+          setDragSource(null);
+        }}
         onDragOver={(event) => event.preventDefault()}
         onDrop={() => handleBackpackDrop(slot.slotIndex)}
       >
@@ -265,13 +387,18 @@ function App() {
     );
   };
 
-  const renderWorkbenchCard = (card: WorkbenchCard) => {
+  const renderWorkbenchCard = (card: WorkbenchVisualCard) => {
     const item = getItemDefinition(card.itemId);
-    const stackIndex = stackCardIndex.get(card.id) ?? 0;
+    const isSelected =
+      selectedWorkbenchCard?.stackId === card.stackId && selectedWorkbenchCard?.itemId === card.itemId;
+    const isHoldingTarget = stackHold?.targetCardId === card.id;
     const style = {
-      left: `${card.x + stackIndex * CARD_STACK_OFFSET_X}px`,
-      top: `${card.y + stackIndex * CARD_STACK_OFFSET_Y}px`,
-      zIndex: 10 + stackIndex,
+      left: `${card.x + card.order * CARD_STACK_OFFSET_X}px`,
+      top: `${card.y + card.order * CARD_STACK_OFFSET_Y}px`,
+      zIndex: 10 + card.order,
+    } as CSSProperties;
+    const ringStyle = {
+      background: `conic-gradient(rgba(201, 168, 76, 0.95) ${stackProgress * 360}deg, rgba(255, 255, 255, 0.08) 0deg)`,
     } as CSSProperties;
 
     return (
@@ -279,15 +406,37 @@ function App() {
         key={card.id}
         type="button"
         draggable
-        className={`item-card workbench-card ${
-          selectedWorkbenchCardId === card.id ? 'selected' : ''
+        className={`item-card workbench-card ${isSelected ? 'selected' : ''} ${
+          isHoldingTarget ? 'stack-target' : ''
         }`}
         style={style}
         onClick={() => handleWorkbenchCardClick(card)}
-        onDragStart={() => setDragSource({ kind: 'workbench', cardId: card.id })}
-        onDragEnd={() => setDragSource(null)}
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => handleWorkbenchCardDrop(event, card.id)}
+        onDragStart={() => {
+          clearStackHold();
+          setDragSource({ kind: 'workbench', cardId: card.id });
+        }}
+        onDragEnd={() => {
+          clearStackHold();
+          setDragSource(null);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          beginStackHold(card.id);
+        }}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          beginStackHold(card.id);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (stackHold?.targetCardId === card.id) {
+            clearStackHold();
+          }
+        }}
+        onDrop={handleWorkbenchCardDrop}
       >
         <span className="slot-index">W</span>
         {item ? (
@@ -295,6 +444,13 @@ function App() {
             <span className="item-card-icon">{item.icon}</span>
             <span className="item-card-name">{item.name}</span>
             <span className="item-card-type">{itemTypeLabel[item.type]}</span>
+            {card.sameItemCount > 1 && <span className="stack-amount">x{card.sameItemCount}</span>}
+            {isHoldingTarget && (
+              <span className="stack-progress" aria-hidden="true">
+                <span className="stack-progress-ring" style={ringStyle} />
+                <span className="stack-progress-core" />
+              </span>
+            )}
           </>
         ) : (
           <span className="item-card-empty">空堆</span>
@@ -315,9 +471,7 @@ function App() {
             <span className="day-label">Day</span>
             <span className="day-num">{environment.day}</span>
           </div>
-          <div className={`phase-badge phase-${environment.timeOfDay}`}>
-            {phaseLabel[environment.timeOfDay]}
-          </div>
+          <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
           <div className="top-right">
             <div className="weather-box">
               <span className="weather-icon">{weatherIcon[environment.weather]}</span>
@@ -413,9 +567,9 @@ function App() {
           <div className="card-workspace">
             <div className="workspace-header">
               <div>
-                <div className="workspace-title">自由堆叠工作台</div>
+                <div className="workspace-title">自由工作台</div>
                 <div className="workspace-subtitle">
-                  拖到另一张卡上就是堆叠，只有明确点击“合成”才会结算，不再自动触发。
+                  开出来的卡会横向排开。拖住一张卡悬停到另一张卡上，环形进度条走满才会真正堆叠；移开即可取消。
                 </div>
               </div>
               <button type="button" className="btn-subtle" onClick={storeAllWorkbenchItems}>
@@ -424,22 +578,25 @@ function App() {
             </div>
 
             <div className={`drop-zone ${dragSource ? 'active' : ''}`}>
-              {dragSource ? '松手放入工作台' : '把背包卡拖进整片区域，自由摆放和堆叠'}
+              {dragSource ? '拖到空白处摆放，悬停到卡牌上进行堆叠' : '工作台是整片自由区域，不再有固定格子'}
             </div>
 
             <div
               ref={boardRef}
               className={`workspace-board ${dragSource ? 'dragging' : ''}`}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                clearStackHold();
+              }}
               onDrop={handleWorkbenchBoardDrop}
               onClick={() => selectWorkbenchCard(null)}
             >
-              {workbench.map((card) => renderWorkbenchCard(card))}
-              {workbench.length === 0 && (
+              {workbenchVisualCards.map((card) => renderWorkbenchCard(card))}
+              {workbenchVisualCards.length === 0 && (
                 <div className="workspace-hint">
                   这里不再有固定格。
                   <br />
-                  从背包或手牌翻出的物品拖进来，然后把卡牌叠到一起。
+                  从背包或行动翻出的物品会分开摆在台面上，再拖去组成卡堆。
                 </div>
               )}
             </div>
@@ -496,7 +653,7 @@ function App() {
                   <>
                     <div className="recipe-line">先选中一张工作台上的卡，预览只针对当前堆叠。</div>
                     <div className="recipe-line subtle">
-                      不会再自动合成。只有手动点击按钮，才会把当前卡堆结算成产物。
+                      不会自动合成。必须先形成卡堆，再手动点击按钮结算。
                     </div>
                   </>
                 )}
@@ -547,6 +704,7 @@ function App() {
                     <p>{selectedWorkbenchItem.description}</p>
                     <div className="paper-meta">
                       <span>所在卡堆 {selectedWorkbenchStack.length} 张</span>
+                      <span>同名 x{selectedWorkbenchSameItemCount}</span>
                       <span>类型 {itemTypeLabel[selectedWorkbenchItem.type]}</span>
                     </div>
                     <div className="paper-actions">
@@ -572,8 +730,8 @@ function App() {
                 ) : (
                   <>
                     <div className="paper-kicker">工作札记</div>
-                    <h3>拖进来，再堆上去</h3>
-                    <p>把卡拖进整片工作台区域，再拖到另一张卡上形成卡堆。当前只会手动合成，不会自动结算。</p>
+                    <h3>先摆开，再叠上去</h3>
+                    <p>工作台上的物品会先分开排开。拖住卡牌悬停到目标卡上，环形进度走满才会完成堆叠，过程中随时可以挪开取消。</p>
                   </>
                 )}
               </div>
@@ -751,4 +909,3 @@ function getNeedStatus(
 }
 
 export default App;
-

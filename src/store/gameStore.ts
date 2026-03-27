@@ -369,8 +369,8 @@ const createWorkbenchCard = (
 };
 
 const clampWorkbenchPosition = (position?: { x: number; y: number }) => ({
-  x: Math.max(12, Math.min(420, Math.round(position?.x ?? 156))),
-  y: Math.max(12, Math.min(220, Math.round(position?.y ?? 96))),
+  x: Math.max(16, Math.min(1010, Math.round(position?.x ?? 32))),
+  y: Math.max(16, Math.min(360, Math.round(position?.y ?? 32))),
 });
 
 const getWorkbenchCard = (workbench: WorkbenchCard[], cardId: string) =>
@@ -390,13 +390,20 @@ const addItemsToWorkbench = (
   const targetCard = targetStackId
     ? nextWorkbench.find((card) => card.stackId === targetStackId) ?? null
     : null;
+  const totalGainCount = gains.reduce((total, entry) => total + Math.max(entry.amount, 0), 0);
   let offsetIndex = 0;
 
   gains.forEach(({ itemId, amount }) => {
     for (let i = 0; i < amount; i += 1) {
-      const offsetX = targetCard ? targetCard.x : basePosition.x + ((offsetIndex % 3) - 1) * 18;
-      const offsetY = targetCard ? targetCard.y : basePosition.y + Math.floor(offsetIndex / 3) * 18;
-      nextWorkbench.push(createWorkbenchCard(itemId, offsetX, offsetY, targetStackId));
+      if (targetCard) {
+        nextWorkbench.push(createWorkbenchCard(itemId, targetCard.x, targetCard.y, targetStackId));
+      } else {
+        const column = totalGainCount === 1 ? 0 : offsetIndex % 7;
+        const row = totalGainCount === 1 ? 0 : Math.floor(offsetIndex / 7);
+        const spawnX = basePosition.x + column * 132;
+        const spawnY = basePosition.y + row * 112;
+        nextWorkbench.push(createWorkbenchCard(itemId, spawnX, spawnY));
+      }
       offsetIndex += 1;
     }
   });
@@ -1834,6 +1841,8 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
+
+
 
 
 

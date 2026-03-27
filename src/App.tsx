@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+﻿import { useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import { CardCanvas } from './components/CardCanvas';
 import {
   allPrototypeGoals,
@@ -11,7 +11,7 @@ import {
   useGameStore,
   weatherLabel,
 } from './store/gameStore';
-import type { BackpackSlot, EnvironmentState, StatKey } from './types/game';
+import type { BackpackSlot, EnvironmentState, StatKey, WorkbenchCard } from './types/game';
 
 const coreNeedMeta: Array<{
   key: Extract<StatKey, 'hunger' | 'thirst' | 'temperature' | 'sanity'>;
@@ -57,7 +57,14 @@ const itemTypeLabel = {
   medical: '药品',
 } as const;
 
+const DEFAULT_WORKBENCH_DROP = { x: 170, y: 86 };
+const CARD_STACK_OFFSET_X = 10;
+const CARD_STACK_OFFSET_Y = 8;
+const WORKBENCH_CARD_WIDTH = 112;
+const WORKBENCH_CARD_HEIGHT = 78;
+
 function App() {
+  const boardRef = useRef<HTMLDivElement | null>(null);
   const {
     player,
     environment,
@@ -66,7 +73,7 @@ function App() {
     backpack,
     workbench,
     selectedBackpackSlot,
-    selectedWorkbenchSlot,
+    selectedWorkbenchCardId,
     activeEvent,
     ending,
     logs,
@@ -75,11 +82,11 @@ function App() {
     resolveEvent,
     setTerrain,
     selectBackpackSlot,
-    selectWorkbenchSlot,
+    selectWorkbenchCard,
     moveSelectedToSlot,
     moveBackpackToWorkbench,
     moveWorkbenchToBackpack,
-    moveWorkbenchItem,
+    moveWorkbenchStack,
     storeAllWorkbenchItems,
     useBackpackItem,
     useWorkbenchItem,
@@ -88,18 +95,28 @@ function App() {
     useCard,
   } = useGameStore();
   const [journalOpen, setJournalOpen] = useState(false);
-  const [dragSource, setDragSource] = useState<{
-    kind: 'backpack' | 'workbench';
-    index: number;
-  } | null>(null);
+  const [dragSource, setDragSource] = useState<
+    | { kind: 'backpack'; slotIndex: number }
+    | { kind: 'workbench'; cardId: string }
+    | null
+  >(null);
 
-  const workbenchRecipe = getWorkbenchRecipePreview(workbench);
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
   const selectedBackpackItem = getItemDefinition(selectedBackpackSlotData?.itemId ?? null);
-  const selectedWorkbenchSlotData =
-    selectedWorkbenchSlot !== null ? workbench[selectedWorkbenchSlot] ?? null : null;
-  const selectedWorkbenchItem = getItemDefinition(selectedWorkbenchSlotData?.itemId ?? null);
+  const selectedWorkbenchCard =
+    selectedWorkbenchCardId !== null
+      ? workbench.find((card) => card.id === selectedWorkbenchCardId) ?? null
+      : null;
+  const selectedWorkbenchItem = getItemDefinition(selectedWorkbenchCard?.itemId ?? null);
+  const selectedWorkbenchStack = useMemo(
+    () =>
+      selectedWorkbenchCard
+        ? workbench.filter((card) => card.stackId === selectedWorkbenchCard.stackId)
+        : [],
+    [selectedWorkbenchCard, workbench],
+  );
+  const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
   );
@@ -114,33 +131,39 @@ function App() {
       ),
     [environment.actionLimit, environment.actionsRemaining],
   );
-  const firstEmptyWorkbenchSlot =
-    workbench.find((slot) => slot.itemId === null)?.slotIndex ?? -1;
 
-  useEffect(() => {
-    if (!workbenchRecipe || activeEvent || ending) {
-      return;
+  const stackCardIndex = useMemo(() => {
+    const indexMap = new Map<string, number>();
+    const counters = new Map<string, number>();
+
+    workbench.forEach((card) => {
+      const index = counters.get(card.stackId) ?? 0;
+      indexMap.set(card.id, index);
+      counters.set(card.stackId, index + 1);
+    });
+
+    return indexMap;
+  }, [workbench]);
+
+  const getBoardPoint = (event: DragEvent<HTMLElement>) => {
+    const rect = boardRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return DEFAULT_WORKBENCH_DROP;
     }
 
-    const timer = window.setTimeout(() => {
-      craftWorkbenchRecipe();
-    }, 650);
+    const x = Math.max(
+      12,
+      Math.min(rect.width - WORKBENCH_CARD_WIDTH - 12, event.clientX - rect.left - 56),
+    );
+    const y = Math.max(
+      12,
+      Math.min(rect.height - WORKBENCH_CARD_HEIGHT - 12, event.clientY - rect.top - 28),
+    );
 
-    return () => window.clearTimeout(timer);
-  }, [
-    activeEvent,
-    craftWorkbenchRecipe,
-    ending,
-    environment.actionsRemaining,
-    workbenchRecipe,
-  ]);
+    return { x, y };
+  };
 
   const handleBackpackClick = (slot: BackpackSlot) => {
-    if (selectedWorkbenchSlot !== null) {
-      moveWorkbenchToBackpack(selectedWorkbenchSlot, slot.slotIndex);
-      return;
-    }
-
     if (selectedBackpackSlot !== null && selectedBackpackSlot !== slot.slotIndex) {
       moveSelectedToSlot(slot.slotIndex);
       return;
@@ -149,18 +172,18 @@ function App() {
     selectBackpackSlot(slot.slotIndex);
   };
 
-  const handleWorkbenchClick = (slot: BackpackSlot) => {
+  const handleWorkbenchCardClick = (card: WorkbenchCard) => {
     if (selectedBackpackSlot !== null) {
-      moveBackpackToWorkbench(selectedBackpackSlot, slot.slotIndex);
+      moveBackpackToWorkbench(selectedBackpackSlot, undefined, card.id);
       return;
     }
 
-    if (selectedWorkbenchSlot !== null && selectedWorkbenchSlot !== slot.slotIndex) {
-      moveWorkbenchItem(selectedWorkbenchSlot, slot.slotIndex);
+    if (selectedWorkbenchCardId && selectedWorkbenchCardId !== card.id) {
+      moveWorkbenchStack(selectedWorkbenchCardId, undefined, card.id);
       return;
     }
 
-    selectWorkbenchSlot(slot.slotIndex);
+    selectWorkbenchCard(card.id);
   };
 
   const handleBackpackDrop = (targetIndex: number) => {
@@ -169,50 +192,65 @@ function App() {
     }
 
     if (dragSource.kind === 'workbench') {
-      moveWorkbenchToBackpack(dragSource.index, targetIndex);
+      moveWorkbenchToBackpack(dragSource.cardId, targetIndex);
     }
 
     setDragSource(null);
   };
 
-  const handleWorkbenchDrop = (targetIndex: number) => {
+  const handleWorkbenchBoardDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!dragSource) {
+      return;
+    }
+
+    const point = getBoardPoint(event);
+    if (dragSource.kind === 'backpack') {
+      moveBackpackToWorkbench(dragSource.slotIndex, point);
+    } else {
+      moveWorkbenchStack(dragSource.cardId, point);
+    }
+
+    setDragSource(null);
+  };
+
+  const handleWorkbenchCardDrop = (
+    event: DragEvent<HTMLButtonElement>,
+    targetCardId: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
     if (!dragSource) {
       return;
     }
 
     if (dragSource.kind === 'backpack') {
-      moveBackpackToWorkbench(dragSource.index, targetIndex);
-    } else {
-      moveWorkbenchItem(dragSource.index, targetIndex);
+      moveBackpackToWorkbench(dragSource.slotIndex, undefined, targetCardId);
+    } else if (dragSource.cardId !== targetCardId) {
+      moveWorkbenchStack(dragSource.cardId, undefined, targetCardId);
     }
 
     setDragSource(null);
   };
 
-  const renderItemCard = (slot: BackpackSlot, kind: 'backpack' | 'workbench') => {
+  const renderBackpackCard = (slot: BackpackSlot) => {
     const item = getItemDefinition(slot.itemId);
-    const selected =
-      kind === 'backpack'
-        ? selectedBackpackSlot === slot.slotIndex
-        : selectedWorkbenchSlot === slot.slotIndex;
-
     return (
       <button
-        key={`${kind}-${slot.slotIndex}`}
+        key={`backpack-${slot.slotIndex}`}
         type="button"
         draggable={!!item}
-        className={`item-card ${kind === 'workbench' ? `work-card slot-${slot.slotIndex}` : 'backpack-card'} ${
-          selected ? 'selected' : ''
-        } ${item ? 'filled' : ''}`}
-        onClick={() => (kind === 'backpack' ? handleBackpackClick(slot) : handleWorkbenchClick(slot))}
-        onDragStart={() => item && setDragSource({ kind, index: slot.slotIndex })}
+        className={`item-card backpack-card ${item ? 'filled' : ''} ${
+          selectedBackpackSlot === slot.slotIndex ? 'selected' : ''
+        }`}
+        onClick={() => handleBackpackClick(slot)}
+        onDragStart={() => item && setDragSource({ kind: 'backpack', slotIndex: slot.slotIndex })}
         onDragEnd={() => setDragSource(null)}
         onDragOver={(event) => event.preventDefault()}
-        onDrop={() =>
-          kind === 'backpack' ? handleBackpackDrop(slot.slotIndex) : handleWorkbenchDrop(slot.slotIndex)
-        }
+        onDrop={() => handleBackpackDrop(slot.slotIndex)}
       >
-        <span className="slot-index">{kind === 'backpack' ? `B${slot.slotIndex + 1}` : `W${slot.slotIndex + 1}`}</span>
+        <span className="slot-index">B{slot.slotIndex + 1}</span>
         {item ? (
           <>
             <span className="item-card-icon">{item.icon}</span>
@@ -221,7 +259,45 @@ function App() {
             {slot.amount > 1 && <span className="slot-amount">x{slot.amount}</span>}
           </>
         ) : (
-          <span className="item-card-empty">{kind === 'backpack' ? '空卡位' : '空叠放位'}</span>
+          <span className="item-card-empty">空卡位</span>
+        )}
+      </button>
+    );
+  };
+
+  const renderWorkbenchCard = (card: WorkbenchCard) => {
+    const item = getItemDefinition(card.itemId);
+    const stackIndex = stackCardIndex.get(card.id) ?? 0;
+    const style = {
+      left: `${card.x + stackIndex * CARD_STACK_OFFSET_X}px`,
+      top: `${card.y + stackIndex * CARD_STACK_OFFSET_Y}px`,
+      zIndex: 10 + stackIndex,
+    } as CSSProperties;
+
+    return (
+      <button
+        key={card.id}
+        type="button"
+        draggable
+        className={`item-card workbench-card ${
+          selectedWorkbenchCardId === card.id ? 'selected' : ''
+        }`}
+        style={style}
+        onClick={() => handleWorkbenchCardClick(card)}
+        onDragStart={() => setDragSource({ kind: 'workbench', cardId: card.id })}
+        onDragEnd={() => setDragSource(null)}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => handleWorkbenchCardDrop(event, card.id)}
+      >
+        <span className="slot-index">W</span>
+        {item ? (
+          <>
+            <span className="item-card-icon">{item.icon}</span>
+            <span className="item-card-name">{item.name}</span>
+            <span className="item-card-type">{itemTypeLabel[item.type]}</span>
+          </>
+        ) : (
+          <span className="item-card-empty">空堆</span>
         )}
       </button>
     );
@@ -275,7 +351,6 @@ function App() {
                 </div>
                 <div className="need-track">
                   <div
-                    id={`bar-${need.key}`}
                     className={`need-fill ${status.level === 'crit' ? 'critical' : ''}`}
                     style={{ width: `${value}%` }}
                   />
@@ -338,9 +413,9 @@ function App() {
           <div className="card-workspace">
             <div className="workspace-header">
               <div>
-                <div className="workspace-title">堆叠合成工作台</div>
+                <div className="workspace-title">自由堆叠工作台</div>
                 <div className="workspace-subtitle">
-                  把材料拖进同一片区域，像翻动一页潮湿日记那样，慢慢拼出营地和求生工具。
+                  拖到另一张卡上就是堆叠，只有明确点击“合成”才会结算，不再自动触发。
                 </div>
               </div>
               <button type="button" className="btn-subtle" onClick={storeAllWorkbenchItems}>
@@ -349,57 +424,79 @@ function App() {
             </div>
 
             <div className={`drop-zone ${dragSource ? 'active' : ''}`}>
-              {dragSource ? '松手放入叠放区' : '拖拽物品到这里进行堆叠合成'}
+              {dragSource ? '松手放入工作台' : '把背包卡拖进整片区域，自由摆放和堆叠'}
             </div>
 
-            <div className="workspace-board">
-              {workbench.map((slot) => renderItemCard(slot, 'workbench'))}
-              {!workbench.some((slot) => slot.itemId) && (
+            <div
+              ref={boardRef}
+              className={`workspace-board ${dragSource ? 'dragging' : ''}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={handleWorkbenchBoardDrop}
+              onClick={() => selectWorkbenchCard(null)}
+            >
+              {workbench.map((card) => renderWorkbenchCard(card))}
+              {workbench.length === 0 && (
                 <div className="workspace-hint">
-                  荒野里没有菜单，只有你手里摆出来的东西。
+                  这里不再有固定格。
                   <br />
-                  从右侧背包拖材料上来试试。
+                  从背包或手牌翻出的物品拖进来，然后把卡牌叠到一起。
                 </div>
               )}
             </div>
 
             <div className="workspace-bottom">
               <div className={`recipe-preview ${workbenchRecipe ? 'matched' : ''}`}>
-                <div className="recipe-title">配方预感</div>
-                {workbenchRecipe ? (
+                <div className="recipe-title">当前卡堆</div>
+                {selectedWorkbenchCard ? (
                   <>
-                    <div className="recipe-name">{workbenchRecipe.name}</div>
-                    <div className="recipe-line">{workbenchRecipe.description}</div>
-                    <div className="recipe-eq">
-                      {workbenchRecipe.requires.map((entry) => (
-                        <span key={`req-${entry.itemId}`} className="recipe-token">
-                          {getItemDefinition(entry.itemId)?.name ?? entry.itemId} x{entry.amount}
-                        </span>
-                      ))}
-                      <span className="recipe-arrow">→</span>
-                      {workbenchRecipe.produces.map((entry) => (
-                        <span key={`pro-${entry.itemId}`} className="recipe-token recipe-result">
-                          {getItemDefinition(entry.itemId)?.name ?? entry.itemId} x{entry.amount}
-                        </span>
-                      ))}
+                    <div className="recipe-name">
+                      {selectedWorkbenchStack.length} 张卡 · {selectedWorkbenchItem?.name ?? '未知物品'} 起堆
                     </div>
-                    {workbenchRecipe.preserves && workbenchRecipe.preserves.length > 0 && (
-                      <div className="recipe-line subtle">
-                        保留：
-                        {workbenchRecipe.preserves
-                          .map(
-                            (entry) =>
-                              `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`,
-                          )
-                          .join(' + ')}
-                      </div>
+                    {workbenchRecipe ? (
+                      <>
+                        <div className="recipe-line">{workbenchRecipe.description}</div>
+                        <div className="recipe-eq">
+                          {workbenchRecipe.requires.map((entry) => (
+                            <span key={`req-${entry.itemId}`} className="recipe-token">
+                              {getItemDefinition(entry.itemId)?.name ?? entry.itemId} x{entry.amount}
+                            </span>
+                          ))}
+                          <span className="recipe-arrow">→</span>
+                          {workbenchRecipe.produces.map((entry) => (
+                            <span key={`pro-${entry.itemId}`} className="recipe-token recipe-result">
+                              {getItemDefinition(entry.itemId)?.name ?? entry.itemId} x{entry.amount}
+                            </span>
+                          ))}
+                        </div>
+                        {workbenchRecipe.preserves && workbenchRecipe.preserves.length > 0 && (
+                          <div className="recipe-line subtle">
+                            保留：
+                            {workbenchRecipe.preserves
+                              .map(
+                                (entry) =>
+                                  `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`,
+                              )
+                              .join(' + ')}
+                          </div>
+                        )}
+                        <button type="button" className="btn-paper craft-button" onClick={craftWorkbenchRecipe}>
+                          手动合成当前卡堆
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="recipe-line">这叠卡还不能直接形成配方。</div>
+                        <div className="recipe-line subtle">
+                          海滩最短链：小石子 + 小石子，然后石刀 + 青椰子。
+                        </div>
+                      </>
                     )}
                   </>
                 ) : (
                   <>
-                    <div className="recipe-line">暂时还没有形成可识别的组合。</div>
+                    <div className="recipe-line">先选中一张工作台上的卡，预览只针对当前堆叠。</div>
                     <div className="recipe-line subtle">
-                      海滩最短链：小石子 + 小石子，或者石刀 + 青椰子。
+                      不会再自动合成。只有手动点击按钮，才会把当前卡堆结算成产物。
                     </div>
                   </>
                 )}
@@ -429,14 +526,8 @@ function App() {
                       <button
                         type="button"
                         className="btn-paper secondary-ink"
-                        disabled={firstEmptyWorkbenchSlot < 0 || !!ending}
-                        onClick={() =>
-                          firstEmptyWorkbenchSlot >= 0 &&
-                          moveBackpackToWorkbench(
-                            selectedBackpackSlotData.slotIndex,
-                            firstEmptyWorkbenchSlot,
-                          )
-                        }
+                        disabled={!!ending}
+                        onClick={() => moveBackpackToWorkbench(selectedBackpackSlotData.slotIndex, DEFAULT_WORKBENCH_DROP)}
                       >
                         放上工作台
                       </button>
@@ -449,14 +540,14 @@ function App() {
                       </button>
                     </div>
                   </>
-                ) : selectedWorkbenchItem && selectedWorkbenchSlotData ? (
+                ) : selectedWorkbenchCard && selectedWorkbenchItem ? (
                   <>
-                    <div className="paper-kicker">台面卡</div>
+                    <div className="paper-kicker">工作台卡</div>
                     <h3>{selectedWorkbenchItem.name}</h3>
                     <p>{selectedWorkbenchItem.description}</p>
                     <div className="paper-meta">
-                      <span>工作位 W{selectedWorkbenchSlotData.slotIndex + 1}</span>
-                      <span>继续叠放可尝试配方</span>
+                      <span>所在卡堆 {selectedWorkbenchStack.length} 张</span>
+                      <span>类型 {itemTypeLabel[selectedWorkbenchItem.type]}</span>
                     </div>
                     <div className="paper-actions">
                       {selectedWorkbenchItem.effect && (
@@ -464,7 +555,7 @@ function App() {
                           type="button"
                           className="btn-paper"
                           disabled={!!activeEvent || !!ending}
-                          onClick={() => useWorkbenchItem(selectedWorkbenchSlotData.slotIndex)}
+                          onClick={() => useWorkbenchItem(selectedWorkbenchCard.id)}
                         >
                           直接使用
                         </button>
@@ -472,7 +563,7 @@ function App() {
                       <button
                         type="button"
                         className="btn-paper secondary-ink"
-                        onClick={() => moveWorkbenchToBackpack(selectedWorkbenchSlotData.slotIndex)}
+                        onClick={() => moveWorkbenchToBackpack(selectedWorkbenchCard.id)}
                       >
                         收回背包
                       </button>
@@ -481,8 +572,8 @@ function App() {
                 ) : (
                   <>
                     <div className="paper-kicker">工作札记</div>
-                    <h3>从卡牌开始摆</h3>
-                    <p>选中右侧背包里的物品可以直接放上工作台，也可以拖拽到中央叠放区。</p>
+                    <h3>拖进来，再堆上去</h3>
+                    <p>把卡拖进整片工作台区域，再拖到另一张卡上形成卡堆。当前只会手动合成，不会自动结算。</p>
                   </>
                 )}
               </div>
@@ -521,9 +612,7 @@ function App() {
 
           <div className="info-section">
             <div className="info-head">背包</div>
-            <div className="backpack-grid">
-              {backpack.map((slot) => renderItemCard(slot, 'backpack'))}
-            </div>
+            <div className="backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
           </div>
 
           <div className="info-section">
@@ -556,9 +645,7 @@ function App() {
                 <CardCanvas card={card} disabled={disabled} onClick={() => useCard(card.id)} />
                 <div className="hand-card-meta">
                   <div className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</div>
-                  <div className="hand-card-cost">
-                    {actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}
-                  </div>
+                  <div className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</div>
                 </div>
               </div>
             );
@@ -566,10 +653,7 @@ function App() {
         </section>
       </main>
 
-      <div
-        className={`journal-overlay ${journalOpen ? 'open' : ''}`}
-        onClick={() => setJournalOpen(false)}
-      >
+      <div className={`journal-overlay ${journalOpen ? 'open' : ''}`} onClick={() => setJournalOpen(false)}>
         <div className="journal-book" onClick={(event) => event.stopPropagation()}>
           <div className="journal-header">
             <div className="journal-title">求生日记</div>
@@ -667,3 +751,4 @@ function getNeedStatus(
 }
 
 export default App;
+

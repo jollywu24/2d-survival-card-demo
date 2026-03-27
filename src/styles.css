@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   font-family: "Noto Serif SC", "Source Han Serif SC", serif;
   color: #e6d6b8;
   background:
@@ -751,36 +751,6 @@ button {
   transform: translateY(-1px);
 }
 
-.slot-0 {
-  top: 16px;
-  left: 22px;
-}
-
-.slot-1 {
-  top: 52px;
-  left: 98px;
-}
-
-.slot-2 {
-  top: 22px;
-  left: 196px;
-}
-
-.slot-3 {
-  top: 88px;
-  left: 278px;
-}
-
-.slot-4 {
-  top: 130px;
-  left: 126px;
-}
-
-.slot-5 {
-  top: 142px;
-  left: 10px;
-}
-
 .workspace-bottom {
   display: grid;
   grid-template-columns: minmax(200px, 0.92fr) minmax(260px, 1.08fr);
@@ -1422,5 +1392,36 @@ button {
   .top-right {
     display: grid;
     grid-template-columns: 1fr;
+  }
+}
+
+
+.workspace-board {
+  min-height: 288px;
+  overflow: hidden;
+}
+
+.workspace-board.dragging {
+  border-color: rgba(201, 168, 76, 0.35);
+}
+
+.workbench-card {
+  position: absolute;
+  width: 112px;
+  min-height: 78px;
+  padding: 10px;
+}
+
+.craft-button {
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .workspace-board {
+    min-height: 340px;
+  }
+
+  .workbench-card {
+    width: 120px;
   }
 }

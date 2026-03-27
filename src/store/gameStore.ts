@@ -18,6 +18,7 @@ import type {
   PrototypeGoal,
   PrototypeProgress,
   StatKey,
+  WorkbenchCard,
 } from '../types/game';
 
 interface GameState {
@@ -27,9 +28,9 @@ interface GameState {
   deck: CardDefinition[];
   hand: CardDefinition[];
   backpack: BackpackSlot[];
-  workbench: BackpackSlot[];
+  workbench: WorkbenchCard[];
   selectedBackpackSlot: number | null;
-  selectedWorkbenchSlot: number | null;
+  selectedWorkbenchCardId: string | null;
   activeEvent: EventDefinition | null;
   ending: GameEnding | null;
   logs: LogEntry[];
@@ -37,14 +38,22 @@ interface GameState {
   resolveEvent: (optionId: string) => void;
   setTerrain: (terrain: EnvironmentState['terrain']) => void;
   selectBackpackSlot: (slotIndex: number) => void;
-  selectWorkbenchSlot: (slotIndex: number) => void;
+  selectWorkbenchCard: (cardId: string | null) => void;
   moveSelectedToSlot: (slotIndex: number) => void;
-  moveBackpackToWorkbench: (fromBackpackIndex: number, toWorkbenchIndex: number) => void;
-  moveWorkbenchToBackpack: (fromWorkbenchIndex: number, toBackpackIndex?: number) => void;
-  moveWorkbenchItem: (fromWorkbenchIndex: number, toWorkbenchIndex: number) => void;
+  moveBackpackToWorkbench: (
+    fromBackpackIndex: number,
+    position?: { x: number; y: number },
+    targetCardId?: string,
+  ) => void;
+  moveWorkbenchToBackpack: (workbenchCardId: string, toBackpackIndex?: number) => void;
+  moveWorkbenchStack: (
+    workbenchCardId: string,
+    position?: { x: number; y: number },
+    targetCardId?: string,
+  ) => void;
   storeAllWorkbenchItems: () => void;
   useBackpackItem: (slotIndex: number) => void;
-  useWorkbenchItem: (slotIndex: number) => void;
+  useWorkbenchItem: (cardId: string) => void;
   discardBackpackItem: (slotIndex: number) => void;
   craftRecipe: (recipeId: string) => void;
   craftWorkbenchRecipe: () => void;
@@ -56,7 +65,6 @@ const MAX_STAT = 100;
 const MIN_STAT = 0;
 const HAND_SIZE = 4;
 const BACKPACK_SIZE = 16;
-const WORKBENCH_SIZE = 6;
 const TOTAL_DAYS = 7;
 const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
 const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
@@ -107,12 +115,7 @@ const createInitialBackpack = (): BackpackSlot[] =>
     amount: 0,
   }));
 
-const createInitialWorkbench = (): BackpackSlot[] =>
-  Array.from({ length: WORKBENCH_SIZE }, (_, slotIndex) => ({
-    slotIndex,
-    itemId: null,
-    amount: 0,
-  }));
+const createInitialWorkbench = (): WorkbenchCard[] => [];
 
 const clamp = (value: number) => Math.max(MIN_STAT, Math.min(MAX_STAT, value));
 
@@ -283,122 +286,168 @@ const addItemsToBackpack = (
 
   return { backpack: nextBackpack, overflow };
 };
-
-const addItemsToWorkbench = (
-  workbench: BackpackSlot[],
-  gains: ItemStackChange[] = [],
-): { workbench: BackpackSlot[]; overflow: ItemStackChange[] } => {
-  const nextWorkbench = cloneBackpack(workbench);
-  const overflow: ItemStackChange[] = [];
-
-  gains.forEach(({ itemId, amount }) => {
-    let remaining = amount;
-
-    nextWorkbench.forEach((slot) => {
-      if (remaining === 0 || slot.itemId !== null) {
-        return;
-      }
-
-      slot.itemId = itemId;
-      slot.amount = 1;
-      remaining -= 1;
-    });
-
-    if (remaining > 0) {
-      overflow.push({ itemId, amount: remaining });
-    }
-  });
-
-  return { workbench: nextWorkbench, overflow };
-};
-
-const consumeOneFromSlot = (backpack: BackpackSlot[], slotIndex: number) => {
+const removeSingleUnitFromSlot = (
+  backpack: BackpackSlot[],
+  slotIndex: number,
+): { slots: BackpackSlot[]; removedItemId: string | null } => {
   const nextBackpack = cloneBackpack(backpack);
   const slot = nextBackpack[slotIndex];
 
-  if (!slot || slot.itemId === null) {
-    return nextBackpack;
-  }
-
-  slot.amount -= 1;
-  if (slot.amount <= 0) {
-    slot.itemId = null;
-    slot.amount = 0;
-  }
-
-  return nextBackpack;
-};
-
-const removeSingleUnitFromSlot = (slots: BackpackSlot[], slotIndex: number) => {
-  const nextSlots = cloneBackpack(slots);
-  const slot = nextSlots[slotIndex];
-
   if (!slot || slot.itemId === null || slot.amount <= 0) {
-    return {
-      slots: nextSlots,
-      removedItemId: null as string | null,
-    };
+    return { slots: nextBackpack, removedItemId: null };
   }
 
   const removedItemId = slot.itemId;
-  slot.amount -= 1;
-
-  if (slot.amount <= 0) {
-    nextSlots[slotIndex] = createEmptySlot(slotIndex);
+  if (slot.amount <= 1) {
+    nextBackpack[slotIndex] = createEmptySlot(slotIndex);
+  } else {
+    nextBackpack[slotIndex] = {
+      ...slot,
+      amount: slot.amount - 1,
+    };
   }
 
-  return {
-    slots: nextSlots,
-    removedItemId,
-  };
+  return { slots: nextBackpack, removedItemId };
 };
+
+const consumeOneFromSlot = (backpack: BackpackSlot[], slotIndex: number) =>
+  removeSingleUnitFromSlot(backpack, slotIndex).slots;
 
 const addSingleUnitToBackpackSlot = (
   backpack: BackpackSlot[],
   slotIndex: number,
   itemId: string,
-) => {
+): { backpack: BackpackSlot[]; added: boolean } => {
+  const item = itemById.get(itemId);
+  if (!item) {
+    return { backpack: cloneBackpack(backpack), added: false };
+  }
+
   const nextBackpack = cloneBackpack(backpack);
   const slot = nextBackpack[slotIndex];
-  const item = itemById.get(itemId);
 
-  if (!slot || !item) {
+  if (!slot) {
     return { backpack: nextBackpack, added: false };
   }
 
   if (slot.itemId === null) {
-    nextBackpack[slotIndex] = { slotIndex, itemId, amount: 1 };
+    nextBackpack[slotIndex] = {
+      slotIndex,
+      itemId,
+      amount: 1,
+    };
     return { backpack: nextBackpack, added: true };
   }
 
-  if (slot.itemId === itemId && slot.amount < item.maxStack) {
-    nextBackpack[slotIndex] = { ...slot, amount: slot.amount + 1 };
-    return { backpack: nextBackpack, added: true };
+  if (slot.itemId !== itemId || slot.amount >= item.maxStack) {
+    return { backpack: nextBackpack, added: false };
   }
 
-  return { backpack: nextBackpack, added: false };
+  nextBackpack[slotIndex] = {
+    ...slot,
+    amount: slot.amount + 1,
+  };
+
+  return { backpack: nextBackpack, added: true };
 };
+const cloneWorkbench = (workbench: WorkbenchCard[]) => workbench.map((card) => ({ ...card }));
 
-const addSingleUnitToWorkbenchSlot = (
-  workbench: BackpackSlot[],
-  slotIndex: number,
+const createWorkbenchCard = (
   itemId: string,
-) => {
-  const nextWorkbench = cloneBackpack(workbench);
-  const slot = nextWorkbench[slotIndex];
-
-  if (!slot) {
-    return { workbench: nextWorkbench, added: false };
-  }
-
-  if (slot.itemId === null) {
-    nextWorkbench[slotIndex] = { slotIndex, itemId, amount: 1 };
-    return { workbench: nextWorkbench, added: true };
-  }
-
-  return { workbench: nextWorkbench, added: false };
+  x: number,
+  y: number,
+  stackId?: string,
+): WorkbenchCard => {
+  const id = `${itemId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  return {
+    id,
+    itemId,
+    x,
+    y,
+    stackId: stackId ?? `${id}-stack`,
+  };
 };
 
+const clampWorkbenchPosition = (position?: { x: number; y: number }) => ({
+  x: Math.max(12, Math.min(420, Math.round(position?.x ?? 156))),
+  y: Math.max(12, Math.min(220, Math.round(position?.y ?? 96))),
+});
+
+const getWorkbenchCard = (workbench: WorkbenchCard[], cardId: string) =>
+  workbench.find((card) => card.id === cardId) ?? null;
+
+const getWorkbenchStackCards = (workbench: WorkbenchCard[], stackId: string) =>
+  workbench.filter((card) => card.stackId === stackId);
+
+const addItemsToWorkbench = (
+  workbench: WorkbenchCard[],
+  gains: ItemStackChange[] = [],
+  position?: { x: number; y: number },
+  targetStackId?: string,
+): WorkbenchCard[] => {
+  const nextWorkbench = cloneWorkbench(workbench);
+  const basePosition = clampWorkbenchPosition(position);
+  const targetCard = targetStackId
+    ? nextWorkbench.find((card) => card.stackId === targetStackId) ?? null
+    : null;
+  let offsetIndex = 0;
+
+  gains.forEach(({ itemId, amount }) => {
+    for (let i = 0; i < amount; i += 1) {
+      const offsetX = targetCard ? targetCard.x : basePosition.x + ((offsetIndex % 3) - 1) * 18;
+      const offsetY = targetCard ? targetCard.y : basePosition.y + Math.floor(offsetIndex / 3) * 18;
+      nextWorkbench.push(createWorkbenchCard(itemId, offsetX, offsetY, targetStackId));
+      offsetIndex += 1;
+    }
+  });
+
+  return nextWorkbench;
+};
+
+const setWorkbenchStackPosition = (
+  workbench: WorkbenchCard[],
+  stackId: string,
+  position?: { x: number; y: number },
+) => {
+  const nextWorkbench = cloneWorkbench(workbench);
+  const nextPosition = clampWorkbenchPosition(position);
+  return nextWorkbench.map((card) =>
+    card.stackId === stackId
+      ? {
+          ...card,
+          x: nextPosition.x,
+          y: nextPosition.y,
+        }
+      : card,
+  );
+};
+
+const mergeWorkbenchStacks = (
+  workbench: WorkbenchCard[],
+  sourceStackId: string,
+  targetStackId: string,
+) => {
+  const nextWorkbench = cloneWorkbench(workbench);
+  const targetCard = nextWorkbench.find((card) => card.stackId === targetStackId);
+
+  if (!targetCard || sourceStackId === targetStackId) {
+    return nextWorkbench;
+  }
+
+  return nextWorkbench.map((card) =>
+    card.stackId === sourceStackId
+      ? {
+          ...card,
+          stackId: targetStackId,
+          x: targetCard.x,
+          y: targetCard.y,
+        }
+      : card,
+  );
+};
+
+const removeWorkbenchCard = (workbench: WorkbenchCard[], cardId: string) =>
+  cloneWorkbench(workbench).filter((card) => card.id !== cardId);
 const findBackpackTargetSlot = (backpack: BackpackSlot[], itemId: string) => {
   const item = itemById.get(itemId);
   if (!item) {
@@ -674,13 +723,38 @@ const countSlotItems = (slots: BackpackSlot[]) => {
   return counts;
 };
 
+const countWorkbenchStackItems = (workbench: WorkbenchCard[], stackId: string) => {
+  const counts = new Map<string, number>();
+
+  workbench.forEach((card) => {
+    if (card.stackId !== stackId) {
+      return;
+    }
+    counts.set(card.itemId, (counts.get(card.itemId) ?? 0) + 1);
+  });
+
+  return counts;
+};
+
 const canCraftRecipeFromBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) => {
   const itemCounts = countSlotItems(backpack);
   return recipe.requires.every((requirement) => (itemCounts.get(requirement.itemId) ?? 0) >= requirement.amount);
 };
 
-const getWorkbenchRecipeMatch = (workbench: BackpackSlot[]) => {
-  const occupiedCounts = countSlotItems(workbench);
+const getWorkbenchRecipeMatch = (
+  workbench: WorkbenchCard[],
+  selectedWorkbenchCardId: string | null,
+) => {
+  if (!selectedWorkbenchCardId) {
+    return null;
+  }
+
+  const selectedCard = getWorkbenchCard(workbench, selectedWorkbenchCardId);
+  if (!selectedCard) {
+    return null;
+  }
+
+  const occupiedCounts = countWorkbenchStackItems(workbench, selectedCard.stackId);
   const entries = [...occupiedCounts.entries()];
 
   if (entries.length === 0) {
@@ -699,7 +773,6 @@ const getWorkbenchRecipeMatch = (workbench: BackpackSlot[]) => {
     }) ?? null
   );
 };
-
 const consumeItemsFromBackpack = (backpack: BackpackSlot[], requirements: ItemStackChange[]) => {
   const nextBackpack = cloneBackpack(backpack);
 
@@ -725,6 +798,45 @@ const consumeItemsFromBackpack = (backpack: BackpackSlot[], requirements: ItemSt
   return nextBackpack;
 };
 
+const removeWorkbenchCardsForRecipe = (
+  workbench: WorkbenchCard[],
+  stackId: string,
+  recipe: CraftingRecipe,
+) => {
+  const preserveCounts = new Map<string, number>();
+  (recipe.preserves ?? []).forEach((entry) => {
+    preserveCounts.set(entry.itemId, (preserveCounts.get(entry.itemId) ?? 0) + entry.amount);
+  });
+
+  const consumeCounts = new Map<string, number>();
+  recipe.requires.forEach((entry) => {
+    consumeCounts.set(entry.itemId, (consumeCounts.get(entry.itemId) ?? 0) + entry.amount);
+  });
+  preserveCounts.forEach((amount, itemId) => {
+    consumeCounts.set(itemId, Math.max(0, (consumeCounts.get(itemId) ?? 0) - amount));
+  });
+
+  return cloneWorkbench(workbench).filter((card) => {
+    if (card.stackId !== stackId) {
+      return true;
+    }
+
+    const preserveRemaining = preserveCounts.get(card.itemId) ?? 0;
+    if (preserveRemaining > 0) {
+      preserveCounts.set(card.itemId, preserveRemaining - 1);
+      return true;
+    }
+
+    const consumeRemaining = consumeCounts.get(card.itemId) ?? 0;
+    if (consumeRemaining > 0) {
+      consumeCounts.set(card.itemId, consumeRemaining - 1);
+      return false;
+    }
+
+    return true;
+  });
+};
+
 const createInitialState = () => {
   const seeded = addItemsToBackpack(createInitialBackpack(), [
     { itemId: 'berries', amount: 1 },
@@ -742,7 +854,7 @@ const createInitialState = () => {
     backpack: seeded,
     workbench: createInitialWorkbench(),
     selectedBackpackSlot: null as number | null,
-    selectedWorkbenchSlot: null as number | null,
+    selectedWorkbenchCardId: null as string | null,
     activeEvent: null as EventDefinition | null,
     ending: null as GameEnding | null,
     logs: [createLog('你在海滩醒来，身边只有零散的物资。')],
@@ -999,11 +1111,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const applied = applyEffect(state.player, state.environment, card.effect);
     const environmentAfterAction = spendActions(applied.environment, actionCost);
     const inventoryResult = addItemsToBackpack(state.backpack, card.effect.gainItems);
-    const workbenchResult = addItemsToWorkbench(state.workbench, card.effect.gainWorkbenchItems);
-    const overflowFromWorkbench = addItemsToBackpack(
-      inventoryResult.backpack,
-      workbenchResult.overflow,
+    const nextWorkbench = addItemsToWorkbench(
+      state.workbench,
+      card.effect.gainWorkbenchItems,
+      { x: 182, y: 72 },
     );
+    const nextSelectedWorkbenchCardId = nextWorkbench[nextWorkbench.length - 1]?.id ?? null;
     const nextProgress = updateProgressFromAction(
       state.progress,
       card.id,
@@ -1029,16 +1142,15 @@ export const useGameStore = create<GameState>((set, get) => ({
             .join('、')}。`
         : '';
     const overflowText =
-      [...inventoryResult.overflow, ...overflowFromWorkbench.overflow].length > 0
-        ? ` 背包已满，掉落：${[...inventoryResult.overflow, ...overflowFromWorkbench.overflow].join('、')}。`
-        : '';
+      inventoryResult.overflow.length > 0 ? ` 背包已满，掉落：${inventoryResult.overflow.join('、')}。` : '';
 
     set((current) => ({
       player: applied.player,
       environment: environmentAfterAction,
       progress: nextProgress,
-      backpack: overflowFromWorkbench.backpack,
-      workbench: workbenchResult.workbench,
+      backpack: inventoryResult.backpack,
+      workbench: nextWorkbench,
+      selectedWorkbenchCardId: nextSelectedWorkbenchCardId,
       hand: nextHand,
       activeEvent,
       logs: [
@@ -1113,17 +1225,17 @@ export const useGameStore = create<GameState>((set, get) => ({
         : state.selectedBackpackSlot === slotIndex
           ? null
           : slotIndex,
-      selectedWorkbenchSlot: state.ending ? state.selectedWorkbenchSlot : null,
+      selectedWorkbenchCardId: state.ending ? state.selectedWorkbenchCardId : null,
     }));
   },
 
-  selectWorkbenchSlot: (slotIndex) => {
+  selectWorkbenchCard: (cardId) => {
     set((state) => ({
-      selectedWorkbenchSlot: state.ending
-        ? state.selectedWorkbenchSlot
-        : state.selectedWorkbenchSlot === slotIndex
+      selectedWorkbenchCardId: state.ending
+        ? state.selectedWorkbenchCardId
+        : state.selectedWorkbenchCardId === cardId
           ? null
-          : slotIndex,
+          : cardId,
       selectedBackpackSlot: state.ending ? state.selectedBackpackSlot : null,
     }));
   },
@@ -1146,69 +1258,63 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
-  moveBackpackToWorkbench: (fromBackpackIndex, toWorkbenchIndex) => {
+  moveBackpackToWorkbench: (fromBackpackIndex, position, targetCardId) => {
     const state = get();
     if (state.ending) {
       return;
     }
 
     const sourceSlot = state.backpack[fromBackpackIndex];
-    const targetSlot = state.workbench[toWorkbenchIndex];
-
     if (!sourceSlot?.itemId) {
       return;
     }
 
-    if (!targetSlot || targetSlot.itemId !== null) {
-      set((current) => ({
-        logs: [createLog('工作台这个位置已经被占了，先挪开再叠放。'), ...current.logs].slice(0, 10),
-      }));
-      return;
-    }
-
+    const targetCard = targetCardId ? getWorkbenchCard(state.workbench, targetCardId) : null;
     const removed = removeSingleUnitFromSlot(state.backpack, fromBackpackIndex);
     if (!removed.removedItemId) {
       return;
     }
-    const removedItemId = removed.removedItemId;
-    const inserted = addSingleUnitToWorkbenchSlot(
-      state.workbench,
-      toWorkbenchIndex,
-      removedItemId,
-    );
 
-    if (!inserted.added) {
-      return;
-    }
+    const nextWorkbench = addItemsToWorkbench(
+      state.workbench,
+      [{ itemId: removed.removedItemId, amount: 1 }],
+      position,
+      targetCard?.stackId,
+    );
+    const nextSelectedCardId = targetCardId ?? nextWorkbench[nextWorkbench.length - 1]?.id ?? null;
+    const movedItemName = itemById.get(removed.removedItemId ?? '')?.name ?? removed.removedItemId ?? '未知物品';
 
     set((current) => ({
       backpack: removed.slots,
-      workbench: inserted.workbench,
+      workbench: nextWorkbench,
       selectedBackpackSlot: null,
-      selectedWorkbenchSlot: toWorkbenchIndex,
+      selectedWorkbenchCardId: nextSelectedCardId,
       logs: [
-        createLog(`你把【${itemById.get(removedItemId)?.name ?? removedItemId}】拖进了叠放区。`),
+        createLog(
+          targetCard
+            ? `你把【${movedItemName}】叠到了已有卡堆上。`
+            : `你把【${movedItemName}】放上了工作台。`,
+        ),
         ...current.logs,
       ].slice(0, 10),
     }));
   },
 
-  moveWorkbenchToBackpack: (fromWorkbenchIndex, toBackpackIndex) => {
+  moveWorkbenchToBackpack: (workbenchCardId, toBackpackIndex) => {
     const state = get();
     if (state.ending) {
       return;
     }
 
-    const sourceSlot = state.workbench[fromWorkbenchIndex];
-    if (!sourceSlot?.itemId) {
+    const sourceCard = getWorkbenchCard(state.workbench, workbenchCardId);
+    if (!sourceCard) {
       return;
     }
-    const sourceItemId = sourceSlot.itemId;
 
     const targetIndex =
       typeof toBackpackIndex === 'number'
         ? toBackpackIndex
-        : findBackpackTargetSlot(state.backpack, sourceItemId);
+        : findBackpackTargetSlot(state.backpack, sourceCard.itemId);
 
     if (targetIndex < 0) {
       set((current) => ({
@@ -1217,7 +1323,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const inserted = addSingleUnitToBackpackSlot(state.backpack, targetIndex, sourceItemId);
+    const inserted = addSingleUnitToBackpackSlot(state.backpack, targetIndex, sourceCard.itemId);
     if (!inserted.added) {
       set((current) => ({
         logs: [createLog('目标背包格无法接收这张卡。'), ...current.logs].slice(0, 10),
@@ -1225,40 +1331,48 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const nextWorkbench = cloneBackpack(state.workbench);
-    nextWorkbench[fromWorkbenchIndex] = createEmptySlot(fromWorkbenchIndex);
+    const nextWorkbench = removeWorkbenchCard(state.workbench, workbenchCardId);
 
     set((current) => ({
       backpack: inserted.backpack,
       workbench: nextWorkbench,
-      selectedWorkbenchSlot: null,
+      selectedWorkbenchCardId:
+        current.selectedWorkbenchCardId === workbenchCardId ? null : current.selectedWorkbenchCardId,
       selectedBackpackSlot: targetIndex,
       logs: [
-        createLog(`你把【${itemById.get(sourceItemId)?.name ?? sourceItemId}】收回了背包。`),
+        createLog(`你把【${itemById.get(sourceCard.itemId)?.name ?? sourceCard.itemId}】收回了背包。`),
         ...current.logs,
       ].slice(0, 10),
     }));
   },
 
-  moveWorkbenchItem: (fromWorkbenchIndex, toWorkbenchIndex) => {
+  moveWorkbenchStack: (workbenchCardId, position, targetCardId) => {
     const state = get();
     if (state.ending) {
       return;
     }
 
-    if (fromWorkbenchIndex === toWorkbenchIndex) {
+    const sourceCard = getWorkbenchCard(state.workbench, workbenchCardId);
+    if (!sourceCard) {
       return;
     }
 
-    const sourceSlot = state.workbench[fromWorkbenchIndex];
-    if (!sourceSlot?.itemId) {
-      return;
-    }
+    const targetCard =
+      targetCardId && targetCardId !== workbenchCardId
+        ? getWorkbenchCard(state.workbench, targetCardId)
+        : null;
+
+    const nextWorkbench = targetCard
+      ? mergeWorkbenchStacks(state.workbench, sourceCard.stackId, targetCard.stackId)
+      : setWorkbenchStackPosition(state.workbench, sourceCard.stackId, position);
 
     set((current) => ({
-      workbench: swapBackpackSlots(current.workbench, fromWorkbenchIndex, toWorkbenchIndex),
-      selectedWorkbenchSlot: toWorkbenchIndex,
-      logs: [createLog('你调整了工作台里的叠放顺序。'), ...current.logs].slice(0, 10),
+      workbench: nextWorkbench,
+      selectedWorkbenchCardId: targetCard?.id ?? workbenchCardId,
+      logs: [
+        createLog(targetCard ? '你把两叠卡拖到了一起。' : '你挪动了工作台上的卡堆。'),
+        ...current.logs,
+      ].slice(0, 10),
     }));
   },
 
@@ -1269,34 +1383,33 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     let nextBackpack = cloneBackpack(state.backpack);
-    let nextWorkbench = cloneBackpack(state.workbench);
     const blockedItems: string[] = [];
+    const remainingWorkbench: WorkbenchCard[] = [];
 
-    state.workbench.forEach((slot, slotIndex) => {
-      if (!slot.itemId) {
-        return;
-      }
-
-      const targetIndex = findBackpackTargetSlot(nextBackpack, slot.itemId);
+    state.workbench.forEach((card) => {
+      const targetIndex = findBackpackTargetSlot(nextBackpack, card.itemId);
       if (targetIndex < 0) {
-        blockedItems.push(itemById.get(slot.itemId)?.name ?? slot.itemId);
+        blockedItems.push(itemById.get(card.itemId)?.name ?? card.itemId);
+        remainingWorkbench.push(card);
         return;
       }
 
-      const inserted = addSingleUnitToBackpackSlot(nextBackpack, targetIndex, slot.itemId);
+      const inserted = addSingleUnitToBackpackSlot(nextBackpack, targetIndex, card.itemId);
       if (!inserted.added) {
-        blockedItems.push(itemById.get(slot.itemId)?.name ?? slot.itemId);
+        blockedItems.push(itemById.get(card.itemId)?.name ?? card.itemId);
+        remainingWorkbench.push(card);
         return;
       }
 
       nextBackpack = inserted.backpack;
-      nextWorkbench[slotIndex] = createEmptySlot(slotIndex);
     });
 
     set((current) => ({
       backpack: nextBackpack,
-      workbench: nextWorkbench,
-      selectedWorkbenchSlot: null,
+      workbench: remainingWorkbench,
+      selectedWorkbenchCardId: remainingWorkbench.some((card) => card.id === current.selectedWorkbenchCardId)
+        ? current.selectedWorkbenchCardId
+        : null,
       logs: [
         createLog(
           blockedItems.length > 0
@@ -1307,7 +1420,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       ].slice(0, 10),
     }));
   },
-
   useBackpackItem: (slotIndex) => {
     const state = get();
     if (state.ending) {
@@ -1370,7 +1482,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }));
   },
 
-  useWorkbenchItem: (slotIndex) => {
+  useWorkbenchItem: (cardId) => {
     const state = get();
     if (state.ending) {
       return;
@@ -1381,12 +1493,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       }));
       return;
     }
-    const slot = state.workbench[slotIndex];
-    if (!slot || slot.itemId === null) {
+
+    const card = getWorkbenchCard(state.workbench, cardId);
+    if (!card) {
       return;
     }
 
-    const item = itemById.get(slot.itemId);
+    const item = itemById.get(card.itemId);
     if (!item?.effect) {
       set((current) => ({
         logs: [createLog(`【${item?.name ?? '未知物品'}】现在还不能直接从工作台使用。`), ...current.logs].slice(0, 10),
@@ -1408,7 +1521,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const applied = applyEffect(state.player, state.environment, item.effect);
     const environmentAfterAction = spendActions(applied.environment, actionCost);
-    const removed = removeSingleUnitFromSlot(state.workbench, slotIndex);
+    const nextWorkbench = removeWorkbenchCard(state.workbench, cardId);
     const inventoryResult = addItemsToBackpack(state.backpack, item.effect.gainItems);
     const gainText =
       item.effect.gainItems && item.effect.gainItems.length > 0
@@ -1425,12 +1538,12 @@ export const useGameStore = create<GameState>((set, get) => ({
         lastActionSummary: `我直接在工作台上处理了${item.name}。`,
       },
       backpack: inventoryResult.backpack,
-      workbench: removed.slots,
-      selectedWorkbenchSlot: current.selectedWorkbenchSlot === slotIndex ? null : current.selectedWorkbenchSlot,
+      workbench: nextWorkbench,
+      selectedWorkbenchCardId:
+        current.selectedWorkbenchCardId === cardId ? null : current.selectedWorkbenchCardId,
       logs: [createLog(`你直接在工作台上使用了【${item.name}】。${gainText}`), ...current.logs].slice(0, 10),
     }));
   },
-
   discardBackpackItem: (slotIndex) => {
     const state = get();
     if (state.ending) {
@@ -1525,39 +1638,33 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const recipe = getWorkbenchRecipeMatch(state.workbench);
-    if (!recipe) {
+    const recipe = getWorkbenchRecipeMatch(state.workbench, state.selectedWorkbenchCardId);
+    if (!recipe || !state.selectedWorkbenchCardId) {
       return;
     }
 
-    const actionCost = 0;
-    if (!canAffordAction(state.environment, actionCost)) {
-      set((current) => ({
-        logs: [createLog(`本阶段行动次数不足，无法完成【${recipe.name}】叠放合成。`), ...current.logs].slice(0, 10),
-      }));
+    const selectedCard = getWorkbenchCard(state.workbench, state.selectedWorkbenchCardId);
+    if (!selectedCard) {
       return;
     }
 
-    const emptiedWorkbench = createInitialWorkbench();
-    const preservedOnWorkbench = addItemsToWorkbench(
-      emptiedWorkbench,
-      recipe.preserves ?? [],
+    const basePosition = { x: selectedCard.x, y: selectedCard.y };
+    const nextWorkbenchBase = removeWorkbenchCardsForRecipe(
+      state.workbench,
+      selectedCard.stackId,
+      recipe,
     );
-    const producedOnWorkbench = addItemsToWorkbench(
-      preservedOnWorkbench.workbench,
+    const nextWorkbench = addItemsToWorkbench(
+      nextWorkbenchBase,
       recipe.produces,
+      basePosition,
+      selectedCard.stackId,
     );
-    const overflowToBackpack = addItemsToBackpack(state.backpack, [
-      ...preservedOnWorkbench.overflow,
-      ...producedOnWorkbench.overflow,
-    ]);
+    const nextSelectedWorkbenchCardId =
+      nextWorkbench.find((card) => card.stackId === selectedCard.stackId)?.id ?? null;
     const outputText = recipe.produces
       .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
       .join('、');
-    const overflowText =
-      overflowToBackpack.overflow.length > 0
-        ? ` 背包也放不下，掉落：${overflowToBackpack.overflow.join('、')}。`
-        : '';
     const nextProgress: PrototypeProgress = {
       ...state.progress,
       campfireCrafted:
@@ -1569,23 +1676,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       beaconCrafted:
         state.progress.beaconCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),
-      lastActionSummary: `我把材料在工作台上叠到一起，拼出了“${recipe.name}”。`,
+      lastActionSummary: `我把材料在工作台上叠到一起，手动完成了“${recipe.name}”。`,
     };
 
     set((current) => ({
       progress: nextProgress,
-      environment: spendActions(current.environment, actionCost),
-      backpack: overflowToBackpack.backpack,
-      workbench: producedOnWorkbench.workbench,
-      selectedWorkbenchSlot: null,
+      backpack: current.backpack,
+      workbench: nextWorkbench,
+      selectedWorkbenchCardId: nextSelectedWorkbenchCardId,
       selectedBackpackSlot: null,
       logs: [
-        createLog(`叠放合成成功：${recipe.name}。产出 ${outputText}。${overflowText}`),
+        createLog(`手动合成成功：${recipe.name}。产出 ${outputText}。`),
         ...current.logs,
       ].slice(0, 10),
     }));
   },
-
   nextTurn: () => {
     const state = get();
     if (state.ending) {
@@ -1719,11 +1824,24 @@ export const getItemDefinition = (itemId: string | null): ItemDefinition | null 
 export const allCraftingRecipes = craftingRecipes;
 export const canCraftInBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) =>
   canCraftRecipeFromBackpack(backpack, recipe);
-export const getWorkbenchRecipePreview = (workbench: BackpackSlot[]) =>
-  getWorkbenchRecipeMatch(workbench);
+export const getWorkbenchRecipePreview = (
+  workbench: WorkbenchCard[],
+  selectedWorkbenchCardId: string | null,
+) => getWorkbenchRecipeMatch(workbench, selectedWorkbenchCardId);
 export const allPrototypeGoals = prototypeGoals;
 export const isPrototypeGoalComplete = (
   goal: PrototypeGoal,
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
+
+
+
+
+
+
+
+
+
+
+

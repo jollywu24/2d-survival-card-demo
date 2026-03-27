@@ -145,6 +145,14 @@ export interface BackpackSlot {
   amount: number;
 }
 
+export interface WorkbenchCard {
+  id: string;
+  itemId: string;
+  x: number;
+  y: number;
+  stackId: string;
+}
+
 export interface EventOption {
   id: string;
   label: string;
@@ -164,3 +172,4 @@ export interface LogEntry {
   id: string;
   text: string;
 }
+

@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
-import { CardCanvas } from './components/CardCanvas';
 import {
+  allCraftingRecipes,
   allPrototypeGoals,
+  canCraftInBackpack,
   getItemDefinition,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
@@ -56,6 +57,42 @@ const itemTypeLabel = {
   water: '饮水',
   medical: '药品',
 } as const;
+const phaseMinuteRange = {
+  day: { start: 6 * 60, length: 12 * 60 },
+  dusk: { start: 18 * 60, length: 4 * 60 },
+  night: { start: 22 * 60, length: 8 * 60 },
+} as const;
+
+const terrainActionContext = {
+  beach: '海滩：可以游泳放松、翻找潮汐带或处理椰子。',
+  jungle: '丛林：更容易获取木材与纤维，但也更消耗体力。',
+  cave: '洞穴：高风险高回报，适合采矿与探索。',
+} as const;
+
+const terrainEncounterCards: Record<
+  EnvironmentState['terrain'],
+  { main: string; action: string; children: string[]; objects: string[] }
+> = {
+  beach: {
+    main: '海湾',
+    action: '随便逛逛',
+    children: ['沙滩', '大海'],
+    objects: ['棕榈树', '小棕树', '野生芦苇'],
+  },
+  jungle: {
+    main: '河畔林隙',
+    action: '沿岸探索',
+    children: ['浅滩', '灌木区'],
+    objects: ['树根', '藤蔓', '蘑菇'],
+  },
+  cave: {
+    main: '洞口营地',
+    action: '深入探路',
+    children: ['洞口', '暗河'],
+    objects: ['钟乳石', '湿苔', '碎矿石'],
+  },
+};
+
 
 const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
 const CARD_STACK_OFFSET_X = 12;
@@ -88,7 +125,7 @@ function App() {
     activeEvent,
     ending,
     logs,
-    nextTurn,
+    sleepAndAdvance,
     resetGame,
     resolveEvent,
     setTerrain,
@@ -115,6 +152,10 @@ function App() {
     null,
   );
   const [stackProgress, setStackProgress] = useState(0);
+  const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
+    null,
+  );
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
 
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
@@ -139,6 +180,10 @@ function App() {
     [selectedWorkbenchCard, selectedWorkbenchStack],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
+  const craftableBackpackRecipes = useMemo(
+    () => allCraftingRecipes.filter((recipe) => canCraftInBackpack(backpack, recipe)),
+    [backpack],
+  );
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
   );
@@ -146,13 +191,23 @@ function App() {
     isPrototypeGoalComplete(goal, player, progress),
   ).length;
   const energyPips = useMemo(
-    () =>
-      Array.from(
-        { length: environment.actionLimit },
-        (_, index) => index < environment.actionsRemaining,
-      ),
+    () => {
+      const pipCount = 12;
+      const ratio =
+        environment.actionLimit > 0 ? environment.actionsRemaining / environment.actionLimit : 0;
+      const activeCount = Math.round(pipCount * ratio);
+      return Array.from({ length: pipCount }, (_, index) => index < activeCount);
+    },
     [environment.actionLimit, environment.actionsRemaining],
   );
+  const currentClock = useMemo(() => {
+    const range = phaseMinuteRange[environment.timeOfDay];
+    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
+    const minutes = (range.start + elapsed) % (24 * 60);
+    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mm = String(minutes % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }, [environment.timeOfDay, environment.actionsRemaining]);
 
   const workbenchVisualCards = useMemo(() => {
     const stackMap = new Map<string, WorkbenchCard[]>();
@@ -189,6 +244,27 @@ function App() {
 
     return visuals.sort((left, right) => left.y - right.y || left.x - right.x || left.order - right.order);
   }, [workbench]);
+  const workbenchCraftHints = useMemo(() => {
+    const seen = new Set<string>();
+    const hints: Array<{ stackId: string; recipeId: string; recipeName: string }> = [];
+
+    workbenchVisualCards.forEach((card) => {
+      const recipe = getWorkbenchRecipePreview(workbench, card.id);
+      if (!recipe || seen.has(recipe.id)) {
+        return;
+      }
+      seen.add(recipe.id);
+      hints.push({ stackId: card.stackId, recipeId: recipe.id, recipeName: recipe.name });
+    });
+
+    return hints;
+  }, [workbench, workbenchVisualCards]);
+  const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
+
+  const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
+  const activeTerrain = selectedActionTerrain ?? environment.terrain;
+  const activeTerrainCards = terrainEncounterCards[activeTerrain];
+
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {
@@ -350,6 +426,17 @@ function App() {
     setDragSource(null);
   };
 
+  const handleExploreTerrain = () => {
+    if (!actionOptionsEnabled || hand.length === 0) {
+      return;
+    }
+    const randomCard = hand[Math.floor(Math.random() * hand.length)];
+    if (!randomCard) {
+      return;
+    }
+    useCard(randomCard.id);
+  };
+
   const renderBackpackCard = (slot: BackpackSlot) => {
     const item = getItemDefinition(slot.itemId);
     return (
@@ -471,7 +558,8 @@ function App() {
             <span className="day-label">Day</span>
             <span className="day-num">{environment.day}</span>
           </div>
-          <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
+            <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
+            <div className="clock-pill">{currentClock}</div>
           <div className="top-right">
             <div className="weather-box">
               <span className="weather-icon">{weatherIcon[environment.weather]}</span>
@@ -483,8 +571,8 @@ function App() {
             <button type="button" className="btn-journal" onClick={resetGame}>
               重开
             </button>
-            <button type="button" className="btn-end-day" onClick={nextTurn}>
-              推进阶段
+            <button type="button" className="btn-end-day" onClick={sleepAndAdvance}>
+              主动休息
             </button>
           </div>
         </header>
@@ -515,14 +603,14 @@ function App() {
           })}
 
           <div className="energy-block">
-            <div className="panel-label compact">行动余量</div>
+            <div className="panel-label compact">时间余量</div>
             <div className="energy-pips">
               {energyPips.map((active, index) => (
                 <div key={index} className={`pip ${active ? 'active' : 'used'}`} />
               ))}
             </div>
             <div className="energy-label">
-              {environment.actionsRemaining} / {environment.actionLimit} 可用行动
+              剩余 {environment.actionsRemaining} 分钟 / 时段总计 {environment.actionLimit} 分钟
             </div>
           </div>
 
@@ -537,33 +625,58 @@ function App() {
         </aside>
 
         <section className="panel-field">
-          <div className={`scene-strip terrain-${environment.terrain} weather-${environment.weather}`}>
-            <div className="scene-tint" />
-            <div className="horizon" />
-            <div className="terrain-svg">
-              <div className={`terrain-silhouette silhouette-${environment.terrain}`} />
-            </div>
-            {(environment.weather === 'rain' || environment.weather === 'storm') && (
-              <div className="rain-container">
-                {Array.from({ length: environment.weather === 'storm' ? 22 : 14 }, (_, index) => (
-                  <span
-                    key={index}
-                    className="particle"
-                    style={
-                      {
-                        '--left': `${(index * 7) % 100}%`,
-                        '--delay': `${(index % 6) * 0.14}s`,
-                        '--duration': `${0.8 + (index % 5) * 0.12}s`,
-                      } as CSSProperties
-                    }
-                  />
-                ))}
-              </div>
-            )}
-            <div className="terrain-label">{terrainLabel[environment.terrain]}</div>
-            {activeEvent && <div className="event-banner">危机逼近：{activeEvent.title}</div>}
+
+          <div className="terrain-switch">
+            {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
+              <button
+                key={`top-terrain-${terrain}`}
+                type="button"
+                className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
+                onClick={() => {
+                  setTerrain(terrain);
+                  setSelectedActionTerrain(terrain);
+                }}
+              >
+                <span className={`terrain-dot t-${terrain}`} />
+                <span className="terrain-name">{terrainLabel[terrain]}</span>
+              </button>
+            ))}
           </div>
 
+          <div className="location-lane">
+            <button
+              type="button"
+              className={`location-card main ${selectedActionTerrain ? 'selected' : ''}`}
+              onClick={() => {
+                setSelectedActionTerrain(environment.terrain);
+                setLocationModalOpen(true);
+              }}
+            >
+              <span className="location-title">{activeTerrainCards.main}</span>
+              <span className="location-meta">{terrainLabel[activeTerrain]} · 主地点</span>
+            </button>
+            <button
+              type="button"
+              className={`location-card action ${actionOptionsEnabled ? 'active' : ''}`}
+              onClick={handleExploreTerrain}
+              disabled={!actionOptionsEnabled || hand.length === 0 || !!activeEvent || !!ending}
+            >
+              <span className="location-title">{activeTerrainCards.action}</span>
+              <span className="location-meta">点击后随机执行一张行动卡</span>
+            </button>
+            {activeTerrainCards.children.map((entry) => (
+              <div key={entry} className="location-card child">
+                <span className="location-title">{entry}</span>
+                <span className="location-meta">子地点</span>
+              </div>
+            ))}
+            {activeTerrainCards.objects.map((entry) => (
+              <div key={entry} className="location-card object">
+                <span className="location-title">{entry}</span>
+                <span className="location-meta">子物件</span>
+              </div>
+            ))}
+          </div>
           <div className="card-workspace">
             <div className="workspace-header">
               <div>
@@ -571,6 +684,16 @@ function App() {
                 <div className="workspace-subtitle">
                   开出来的卡会横向排开。拖住一张卡悬停到另一张卡上，环形进度条走满才会真正堆叠；移开即可取消。
                 </div>
+                {activeWorkbenchHint && (
+                  <div className="workbench-craft-hint">
+                    <span className="hint-icon">🔨</span>
+                    <span>可合成：{activeWorkbenchHint.recipeName}</span>
+                    <span className="hint-progress">
+                      {workbenchCraftHints.length}/{allCraftingRecipes.length}
+                    </span>
+                    {workbenchCraftHints.length > 1 && <span>+{workbenchCraftHints.length - 1}</span>}
+                  </div>
+                )}
               </div>
               <button type="button" className="btn-subtle" onClick={storeAllWorkbenchItems}>
                 收回台面
@@ -737,25 +860,21 @@ function App() {
               </div>
             </div>
           </div>
+
+
+          <div className="field-backpack-row">
+            <div className="field-backpack-head">
+              <span>背包（仅此区域会随你离开主地点）</span>
+              <span>
+                已占用 {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
+              </span>
+            </div>
+            <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+
+          </div>
         </section>
 
         <aside className="panel-info">
-          <div className="info-section">
-            <div className="info-head">地形</div>
-            {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
-              <button
-                key={terrain}
-                type="button"
-                className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
-                onClick={() => setTerrain(terrain)}
-              >
-                <span className={`terrain-dot t-${terrain}`} />
-                <span className="terrain-name">{terrainLabel[terrain]}</span>
-                <span className="terrain-ap">{environment.actionsRemaining} AP</span>
-              </button>
-            ))}
-          </div>
-
           <div className="info-section">
             <div className="info-head">身体</div>
             <div className="body-grid">
@@ -766,11 +885,6 @@ function App() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="info-section">
-            <div className="info-head">背包</div>
-            <div className="backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
           </div>
 
           <div className="info-section">
@@ -785,31 +899,51 @@ function App() {
             </div>
           </div>
         </aside>
-
-        <section className="panel-hand">
-          <div className="hand-head">
-            <div className="hand-label">当前手牌</div>
-            <div className="hand-count">{hand.length} 张</div>
-          </div>
-          {hand.map((card) => {
-            const actionCost = card.actionCost ?? 1;
-            const disabled =
-              !meetsCondition(player, environment, card.condition) ||
-              !!activeEvent ||
-              !!ending ||
-              environment.actionsRemaining < actionCost;
-            return (
-              <div key={card.id} className="hand-card-wrap">
-                <CardCanvas card={card} disabled={disabled} onClick={() => useCard(card.id)} />
-                <div className="hand-card-meta">
-                  <div className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</div>
-                  <div className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</div>
-                </div>
-              </div>
-            );
-          })}
-        </section>
       </main>
+
+      <div className={`location-action-modal ${locationModalOpen ? 'open' : ''}`} onClick={() => setLocationModalOpen(false)}>
+        <div className="location-action-sheet" onClick={(event) => event.stopPropagation()}>
+          <div className="location-action-hero">
+            <div className="location-action-title">{activeTerrainCards.main}</div>
+            <div className="location-action-sub">
+              {selectedActionTerrain ? terrainActionContext[selectedActionTerrain] : '选择地点后行动'}
+            </div>
+          </div>
+          <div className="location-action-list">
+            {hand.map((card) => {
+              const actionCost = card.actionCost ?? 1;
+              const disabled =
+                !actionOptionsEnabled ||
+                !meetsCondition(player, environment, card.condition) ||
+                !!activeEvent ||
+                !!ending ||
+                environment.actionsRemaining < actionCost;
+              return (
+                <button
+                  key={`modal-${card.id}`}
+                  type="button"
+                  className={`action-option ${disabled ? 'disabled' : ''}`}
+                  disabled={disabled}
+                  onClick={() => {
+                    useCard(card.id);
+                    setLocationModalOpen(false);
+                  }}
+                >
+                  <span className="action-option-name">{card.name}</span>
+                  <span className="action-option-desc">{card.description}</span>
+                  <span className="action-option-meta">
+                    <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
+                    <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" className="location-action-close" onClick={() => setLocationModalOpen(false)}>
+            关闭
+          </button>
+        </div>
+      </div>
 
       <div className={`journal-overlay ${journalOpen ? 'open' : ''}`} onClick={() => setJournalOpen(false)}>
         <div className="journal-book" onClick={(event) => event.stopPropagation()}>

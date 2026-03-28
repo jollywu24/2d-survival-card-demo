@@ -2,6 +2,7 @@
 import {
   allCraftingRecipes,
   allPrototypeGoals,
+  canCraftInBackpack,
   getItemDefinition,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
@@ -62,6 +63,7 @@ const terrainActionContext = {
   jungle: '丛林：更容易获取木材与纤维，但也更消耗体力。',
   cave: '洞穴：高风险高回报，适合采矿与探索。',
 } as const;
+
 const terrainEncounterCards: Record<
   EnvironmentState['terrain'],
   { main: string; action: string; children: string[]; objects: string[] }
@@ -85,6 +87,7 @@ const terrainEncounterCards: Record<
     objects: ['钟乳石', '湿苔', '碎矿石'],
   },
 };
+
 
 const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
 const CARD_STACK_OFFSET_X = 12;
@@ -144,6 +147,10 @@ function App() {
     null,
   );
   const [stackProgress, setStackProgress] = useState(0);
+
+  const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
+
+
   const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
     null,
   );
@@ -171,6 +178,10 @@ function App() {
     [selectedWorkbenchCard, selectedWorkbenchStack],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
+  const craftableBackpackRecipes = useMemo(
+    () => allCraftingRecipes.filter((recipe) => canCraftInBackpack(backpack, recipe)),
+    [backpack],
+  );
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
   );
@@ -237,9 +248,15 @@ function App() {
     return hints;
   }, [workbench, workbenchVisualCards]);
   const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
+
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
   const activeTerrain = selectedActionTerrain ?? environment.terrain;
   const activeTerrainCards = terrainEncounterCards[activeTerrain];
+=======
+
+  const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
+
+
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {
@@ -914,6 +931,94 @@ function App() {
             </div>
           </div>
         </aside>
+
+
+        <section className="panel-hand">
+          <div className={`panel-backpack-quick ${quickBackpackOpen ? 'open' : 'collapsed'}`}>
+            <div className="quickbar-head">
+              <div className="quickbar-title">
+                <span>背包快捷栏</span>
+                <span className="quickbar-count">
+                  {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
+                </span>
+              </div>
+              <div className="quickbar-actions">
+                {craftableBackpackRecipes.length > 0 && (
+                  <div className="quickbar-craftable">
+                    可做 {craftableBackpackRecipes[0].name}
+                    {craftableBackpackRecipes.length > 1 && ` +${craftableBackpackRecipes.length - 1}`}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="btn-subtle quickbar-toggle"
+                  onClick={() => setQuickBackpackOpen((open) => !open)}
+                >
+                  {quickBackpackOpen ? '收起' : '展开'}
+                </button>
+              </div>
+            </div>
+            {quickBackpackOpen && (
+              <div className="quickbar-row">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+            )}
+          </div>
+
+          <div className="hand-strip">
+            <div className="hand-head">
+              <div className="hand-label">当前手牌</div>
+              <div className="hand-count">{hand.length} 张</div>
+            </div>
+
+            <div className="action-option-panel">
+              <div className="action-option-head">
+                <div className="action-option-title">
+                  {selectedActionTerrain ? `${terrainLabel[selectedActionTerrain]}行动选项` : '先点击地点再行动'}
+                </div>
+                <div className="action-option-sub">
+                  {selectedActionTerrain ? terrainActionContext[selectedActionTerrain] : '点击右侧“地形”中的地点后，才会激活这里的行动按钮。'}
+                </div>
+              </div>
+
+              <div className="action-option-grid">
+                {hand.map((card) => {
+                  const actionCost = card.actionCost ?? 1;
+                  const disabled =
+                    !actionOptionsEnabled ||
+                    !meetsCondition(player, environment, card.condition) ||
+                    !!activeEvent ||
+                    !!ending ||
+                    environment.actionsRemaining < actionCost;
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={`action-option ${disabled ? 'disabled' : ''}`}
+                      disabled={disabled}
+                      onClick={() => useCard(card.id)}
+                    >
+                      <span className="action-option-name">{card.name}</span>
+                      <span className="action-option-desc">{card.description}</span>
+                      <span className="action-option-meta">
+                        <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
+                        <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+                {hand.length === 0 && (
+                  <div className="action-option-empty">当前没有可执行的行动卡。</div>
+                )}
+                {!actionOptionsEnabled && selectedActionTerrain && (
+                  <div className="action-option-empty">请先把当前地点切换到 {terrainLabel[selectedActionTerrain]}。</div>
+                )}
+                {!selectedActionTerrain && (
+                  <div className="action-option-empty">先点击右侧地点，再从这里选择行动。</div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </section>
 
       </main>
 

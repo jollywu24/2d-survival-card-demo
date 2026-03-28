@@ -2,6 +2,7 @@
 import {
   allCraftingRecipes,
   allPrototypeGoals,
+  canCraftInBackpack,
   getItemDefinition,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
@@ -150,6 +151,13 @@ function App() {
     null,
   );
 
+  const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
+
+
+  const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
+    null,
+  );
+
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
   const selectedBackpackItem = getItemDefinition(selectedBackpackSlotData?.itemId ?? null);
@@ -173,6 +181,10 @@ function App() {
     [selectedWorkbenchCard, selectedWorkbenchStack],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
+  const craftableBackpackRecipes = useMemo(
+    () => allCraftingRecipes.filter((recipe) => canCraftInBackpack(backpack, recipe)),
+    [backpack],
+  );
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
   );
@@ -243,6 +255,7 @@ function App() {
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
   const activeTerrain = selectedActionTerrain ?? environment.terrain;
   const activeTerrainCards = terrainEncounterCards[activeTerrain];
+
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {
@@ -602,6 +615,7 @@ function App() {
         </aside>
 
         <section className="panel-field">
+
           <div className="terrain-switch">
             {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
               <button
@@ -618,6 +632,7 @@ function App() {
               </button>
             ))}
           </div>
+
           <div className="location-lane">
             <button
               type="button"
@@ -873,6 +888,7 @@ function App() {
             </div>
           </div>
 
+
           <div className="field-backpack-row">
             <div className="field-backpack-head">
               <span>背包（仅此区域会随你离开主地点）</span>
@@ -881,6 +897,7 @@ function App() {
               </span>
             </div>
             <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+
           </div>
         </section>
 

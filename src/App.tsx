@@ -147,6 +147,9 @@ function App() {
     null,
   );
   const [stackProgress, setStackProgress] = useState(0);
+  const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
+    null,
+  );
 
   const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
 
@@ -252,7 +255,6 @@ function App() {
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
   const activeTerrain = selectedActionTerrain ?? environment.terrain;
   const activeTerrainCards = terrainEncounterCards[activeTerrain];
-
 
 
   const canStackOnCard = (targetCardId: string) => {
@@ -613,6 +615,24 @@ function App() {
         </aside>
 
         <section className="panel-field">
+
+          <div className="terrain-switch">
+            {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
+              <button
+                key={`top-terrain-${terrain}`}
+                type="button"
+                className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
+                onClick={() => {
+                  setTerrain(terrain);
+                  setSelectedActionTerrain(terrain);
+                }}
+              >
+                <span className={`terrain-dot t-${terrain}`} />
+                <span className="terrain-name">{terrainLabel[terrain]}</span>
+              </button>
+            ))}
+          </div>
+
           <div className="location-lane">
             <button
               type="button"
@@ -868,6 +888,7 @@ function App() {
             </div>
           </div>
 
+
           <div className="field-backpack-row">
             <div className="field-backpack-head">
               <span>背包（仅此区域会随你离开主地点）</span>
@@ -876,29 +897,11 @@ function App() {
               </span>
             </div>
             <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+
           </div>
         </section>
 
         <aside className="panel-info">
-          <div className="info-section">
-            <div className="info-head">地形</div>
-            {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
-              <button
-                key={terrain}
-                type="button"
-                className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
-                onClick={() => {
-                  setTerrain(terrain);
-                  setSelectedActionTerrain(terrain);
-                }}
-              >
-                <span className={`terrain-dot t-${terrain}`} />
-                <span className="terrain-name">{terrainLabel[terrain]}</span>
-                <span className="terrain-ap">{environment.actionsRemaining} AP</span>
-              </button>
-            ))}
-          </div>
-
           <div className="info-section">
             <div className="info-head">身体</div>
             <div className="body-grid">
@@ -909,11 +912,6 @@ function App() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="info-section">
-            <div className="info-head">背包</div>
-            <div className="info-text-muted">背包快捷栏已移动到底部行动卡上方。</div>
           </div>
 
           <div className="info-section">
@@ -928,95 +926,6 @@ function App() {
             </div>
           </div>
         </aside>
-
-
-        <section className="panel-hand">
-          <div className={`panel-backpack-quick ${quickBackpackOpen ? 'open' : 'collapsed'}`}>
-            <div className="quickbar-head">
-              <div className="quickbar-title">
-                <span>背包快捷栏</span>
-                <span className="quickbar-count">
-                  {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
-                </span>
-              </div>
-              <div className="quickbar-actions">
-                {craftableBackpackRecipes.length > 0 && (
-                  <div className="quickbar-craftable">
-                    可做 {craftableBackpackRecipes[0].name}
-                    {craftableBackpackRecipes.length > 1 && ` +${craftableBackpackRecipes.length - 1}`}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="btn-subtle quickbar-toggle"
-                  onClick={() => setQuickBackpackOpen((open) => !open)}
-                >
-                  {quickBackpackOpen ? '收起' : '展开'}
-                </button>
-              </div>
-            </div>
-            {quickBackpackOpen && (
-              <div className="quickbar-row">{backpack.map((slot) => renderBackpackCard(slot))}</div>
-            )}
-          </div>
-
-          <div className="hand-strip">
-            <div className="hand-head">
-              <div className="hand-label">当前手牌</div>
-              <div className="hand-count">{hand.length} 张</div>
-            </div>
-
-            <div className="action-option-panel">
-              <div className="action-option-head">
-                <div className="action-option-title">
-                  {selectedActionTerrain ? `${terrainLabel[selectedActionTerrain]}行动选项` : '先点击地点再行动'}
-                </div>
-                <div className="action-option-sub">
-                  {selectedActionTerrain ? terrainActionContext[selectedActionTerrain] : '点击右侧“地形”中的地点后，才会激活这里的行动按钮。'}
-                </div>
-              </div>
-
-              <div className="action-option-grid">
-                {hand.map((card) => {
-                  const actionCost = card.actionCost ?? 1;
-                  const disabled =
-                    !actionOptionsEnabled ||
-                    !meetsCondition(player, environment, card.condition) ||
-                    !!activeEvent ||
-                    !!ending ||
-                    environment.actionsRemaining < actionCost;
-                  return (
-                    <button
-                      key={card.id}
-                      type="button"
-                      className={`action-option ${disabled ? 'disabled' : ''}`}
-                      disabled={disabled}
-                      onClick={() => useCard(card.id)}
-                    >
-                      <span className="action-option-name">{card.name}</span>
-                      <span className="action-option-desc">{card.description}</span>
-                      <span className="action-option-meta">
-                        <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
-                        <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
-                      </span>
-                    </button>
-                  );
-                })}
-                {hand.length === 0 && (
-                  <div className="action-option-empty">当前没有可执行的行动卡。</div>
-                )}
-                {!actionOptionsEnabled && selectedActionTerrain && (
-                  <div className="action-option-empty">请先把当前地点切换到 {terrainLabel[selectedActionTerrain]}。</div>
-                )}
-                {!selectedActionTerrain && (
-                  <div className="action-option-empty">先点击右侧地点，再从这里选择行动。</div>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </section>
-
       </main>
 
       <div className={`journal-overlay ${journalOpen ? 'open' : ''}`} onClick={() => setJournalOpen(false)}>

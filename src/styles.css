@@ -443,6 +443,16 @@ button {
   background: var(--night);
 }
 
+.terrain-switch {
+  display: flex;
+  gap: 8px;
+}
+
+.terrain-switch .terrain-chip {
+  flex: 1;
+  margin-bottom: 0;
+}
+
 .location-lane {
   display: flex;
   gap: 8px;

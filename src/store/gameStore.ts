@@ -1101,7 +1101,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!canAffordAction(state.environment, actionCost)) {
       set((current) => ({
         logs: [
-          createLog(`【${card.name}】需要 ${actionCost} 点行动次数，但本阶段只剩 ${state.environment.actionsRemaining} 点。`),
+          createLog(`【${card.name}】需要 ${actionCost} 点时间，但当前时段只剩 ${state.environment.actionsRemaining} 点。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1166,6 +1166,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...current.logs,
       ].slice(0, 10),
     }));
+
+    if (!activeEvent && environmentAfterAction.actionsRemaining <= 0) {
+      get().nextTurn();
+    }
   },
 
   resolveEvent: (optionId) => {
@@ -1456,7 +1460,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!canAffordAction(state.environment, actionCost)) {
       set((current) => ({
         logs: [
-          createLog(`本阶段行动次数不足，无法使用【${item.name}】。`),
+          createLog(`本阶段时间不足，无法使用【${item.name}】。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1519,7 +1523,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!canAffordAction(state.environment, actionCost)) {
       set((current) => ({
         logs: [
-          createLog(`本阶段行动次数不足，无法使用【${item.name}】。`),
+          createLog(`本阶段时间不足，无法使用【${item.name}】。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1600,7 +1604,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!canAffordAction(state.environment, actionCost)) {
       set((current) => ({
         logs: [
-          createLog(`本阶段行动次数不足，无法合成【${recipe.name}】。`),
+          createLog(`本阶段时间不足，无法合成【${recipe.name}】。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1787,7 +1791,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       ending,
       logs: [
         createLog(
-          `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}，可行动 ${nextEnvironment.actionLimit} 次。`,
+          `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}，时间上限 ${nextEnvironment.actionLimit}。`,
         ),
         ...foreshadowLogs,
         ...scriptedEventLogs,
@@ -1841,8 +1845,6 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
-
-
 
 
 

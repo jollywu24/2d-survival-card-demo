@@ -556,7 +556,7 @@ function App() {
               重开
             </button>
             <button type="button" className="btn-end-day" onClick={nextTurn}>
-              推进阶段
+              主动休息
             </button>
           </div>
         </header>
@@ -587,14 +587,14 @@ function App() {
           })}
 
           <div className="energy-block">
-            <div className="panel-label compact">行动余量</div>
+            <div className="panel-label compact">时间余量</div>
             <div className="energy-pips">
               {energyPips.map((active, index) => (
                 <div key={index} className={`pip ${active ? 'active' : 'used'}`} />
               ))}
             </div>
             <div className="energy-label">
-              {environment.actionsRemaining} / {environment.actionLimit} 可用行动
+              {environment.actionsRemaining} / {environment.actionLimit} 当前时段
             </div>
           </div>
 

@@ -57,6 +57,42 @@ const itemTypeLabel = {
   water: '饮水',
   medical: '药品',
 } as const;
+const phaseMinuteRange = {
+  day: { start: 6 * 60, length: 12 * 60 },
+  dusk: { start: 18 * 60, length: 4 * 60 },
+  night: { start: 22 * 60, length: 8 * 60 },
+} as const;
+
+const terrainActionContext = {
+  beach: '海滩：可以游泳放松、翻找潮汐带或处理椰子。',
+  jungle: '丛林：更容易获取木材与纤维，但也更消耗体力。',
+  cave: '洞穴：高风险高回报，适合采矿与探索。',
+} as const;
+
+const terrainEncounterCards: Record<
+  EnvironmentState['terrain'],
+  { main: string; action: string; children: string[]; objects: string[] }
+> = {
+  beach: {
+    main: '海湾',
+    action: '随便逛逛',
+    children: ['沙滩', '大海'],
+    objects: ['棕榈树', '小棕树', '野生芦苇'],
+  },
+  jungle: {
+    main: '河畔林隙',
+    action: '沿岸探索',
+    children: ['浅滩', '灌木区'],
+    objects: ['树根', '藤蔓', '蘑菇'],
+  },
+  cave: {
+    main: '洞口营地',
+    action: '深入探路',
+    children: ['洞口', '暗河'],
+    objects: ['钟乳石', '湿苔', '碎矿石'],
+  },
+};
+
 
 const terrainActionContext = {
   beach: '海滩：可以游泳放松、翻找潮汐带或处理椰子。',
@@ -186,13 +222,23 @@ function App() {
     isPrototypeGoalComplete(goal, player, progress),
   ).length;
   const energyPips = useMemo(
-    () =>
-      Array.from(
-        { length: environment.actionLimit },
-        (_, index) => index < environment.actionsRemaining,
-      ),
+    () => {
+      const pipCount = 12;
+      const ratio =
+        environment.actionLimit > 0 ? environment.actionsRemaining / environment.actionLimit : 0;
+      const activeCount = Math.round(pipCount * ratio);
+      return Array.from({ length: pipCount }, (_, index) => index < activeCount);
+    },
     [environment.actionLimit, environment.actionsRemaining],
   );
+  const currentClock = useMemo(() => {
+    const range = phaseMinuteRange[environment.timeOfDay];
+    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
+    const minutes = (range.start + elapsed) % (24 * 60);
+    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mm = String(minutes % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }, [environment.timeOfDay, environment.actionsRemaining]);
 
   const workbenchVisualCards = useMemo(() => {
     const stackMap = new Map<string, WorkbenchCard[]>();
@@ -543,7 +589,8 @@ function App() {
             <span className="day-label">Day</span>
             <span className="day-num">{environment.day}</span>
           </div>
-          <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
+            <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
+            <div className="clock-pill">{currentClock}</div>
           <div className="top-right">
             <div className="weather-box">
               <span className="weather-icon">{weatherIcon[environment.weather]}</span>
@@ -594,7 +641,7 @@ function App() {
               ))}
             </div>
             <div className="energy-label">
-              {environment.actionsRemaining} / {environment.actionLimit} 当前时段
+              剩余 {environment.actionsRemaining} 分钟 / 时段总计 {environment.actionLimit} 分钟
             </div>
           </div>
 

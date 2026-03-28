@@ -1500,31 +1500,30 @@ body {
 }
 
 .panel-hand {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-auto-flow: column;
-  grid-auto-columns: 188px;
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
   padding: 12px 18px 14px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   border-top: 1px solid rgba(180, 160, 110, 0.1);
   background: rgba(12, 16, 21, 0.95);
 }
 
 .hand-head {
-  width: 160px;
+  flex: 0 0 160px;
   position: sticky;
   left: 0;
-  align-self: start;
+  align-self: flex-start;
   padding-right: 8px;
   background: linear-gradient(90deg, rgba(12, 16, 21, 0.98), rgba(12, 16, 21, 0.78) 72%, transparent);
   z-index: 2;
 }
 
 .hand-card-wrap {
+  flex-shrink: 0;
   width: 176px;
-  align-self: start;
+  align-self: flex-start;
 }
 
 .backpack-grid {

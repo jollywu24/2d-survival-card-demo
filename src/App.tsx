@@ -123,6 +123,7 @@ function App() {
   );
   const [stackProgress, setStackProgress] = useState(0);
   const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
+
   const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
     null,
   );
@@ -220,7 +221,9 @@ function App() {
     return hints;
   }, [workbench, workbenchVisualCards]);
   const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
+
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
+
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {
@@ -866,6 +869,7 @@ function App() {
               <div className="hand-label">当前手牌</div>
               <div className="hand-count">{hand.length} 张</div>
             </div>
+
             <div className="action-option-panel">
               <div className="action-option-head">
                 <div className="action-option-title">
@@ -913,6 +917,7 @@ function App() {
                 )}
               </div>
             </div>
+
           </div>
         </section>
       </main>

@@ -120,7 +120,7 @@ function App() {
     activeEvent,
     ending,
     logs,
-    nextTurn,
+    sleepAndAdvance,
     resetGame,
     resolveEvent,
     setTerrain,
@@ -555,7 +555,7 @@ function App() {
             <button type="button" className="btn-journal" onClick={resetGame}>
               重开
             </button>
-            <button type="button" className="btn-end-day" onClick={nextTurn}>
+            <button type="button" className="btn-end-day" onClick={sleepAndAdvance}>
               主动休息
             </button>
           </div>

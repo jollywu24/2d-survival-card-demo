@@ -94,6 +94,37 @@ const terrainEncounterCards: Record<
 };
 
 
+const terrainActionContext = {
+  beach: '海滩：可以游泳放松、翻找潮汐带或处理椰子。',
+  jungle: '丛林：更容易获取木材与纤维，但也更消耗体力。',
+  cave: '洞穴：高风险高回报，适合采矿与探索。',
+} as const;
+
+const terrainEncounterCards: Record<
+  EnvironmentState['terrain'],
+  { main: string; action: string; children: string[]; objects: string[] }
+> = {
+  beach: {
+    main: '海湾',
+    action: '随便逛逛',
+    children: ['沙滩', '大海'],
+    objects: ['棕榈树', '小棕树', '野生芦苇'],
+  },
+  jungle: {
+    main: '河畔林隙',
+    action: '沿岸探索',
+    children: ['浅滩', '灌木区'],
+    objects: ['树根', '藤蔓', '蘑菇'],
+  },
+  cave: {
+    main: '洞口营地',
+    action: '深入探路',
+    children: ['洞口', '暗河'],
+    objects: ['钟乳石', '湿苔', '碎矿石'],
+  },
+};
+
+
 const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
 const CARD_STACK_OFFSET_X = 12;
 const CARD_STACK_OFFSET_Y = 8;

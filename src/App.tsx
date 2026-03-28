@@ -1,6 +1,8 @@
 ﻿import type { CSSProperties } from 'react';
 import { CardCanvas } from './components/CardCanvas';
 import {
+  allCraftingRecipes,
+  canCraftInBackpack,
   getItemDefinition,
   meetsCondition,
   terrainLabel,
@@ -41,6 +43,7 @@ function App() {
     moveSelectedToSlot,
     useBackpackItem,
     discardBackpackItem,
+    craftRecipe,
     useCard,
   } = useGameStore();
 
@@ -59,13 +62,11 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="hero-panel">
+      <section className="hero-panel compact">
         <div>
           <p className="eyebrow">2D 荒野求生卡牌 Demo</p>
-          <h1>在回合推进、卡牌与背包整理中活下去</h1>
-          <p className="hero-copy">
-            现在已支持基础背包系统，获得的物品可以在格子里摆放、使用和丢弃。
-          </p>
+          <h1>生存工作台</h1>
+          <p className="hero-copy">一屏查看状态、背包、合成、手牌和日志。</p>
         </div>
         <div className="hero-actions">
           <button type="button" onClick={nextTurn}>
@@ -77,8 +78,8 @@ function App() {
         </div>
       </section>
 
-      <section className="dashboard">
-        <div className="panel hud-panel">
+      <section className="workbench-grid">
+        <div className="panel hud-panel left-column">
           <div className="panel-title">生存 HUD</div>
           <div className="hud-layout">
             <div className="hud-primary-group">
@@ -110,16 +111,15 @@ function App() {
                 <span className="world-chip terrain">{terrainLabel[environment.terrain]}</span>
               </div>
             </div>
-
-            <div className="hud-secondary-group">
-              {secondaryStats.map((key) => (
-                <StatusEmblem key={key} statKey={key} value={player[key]} compact />
-              ))}
-            </div>
+          </div>
+          <div className="hud-secondary-group horizontal">
+            {secondaryStats.map((key) => (
+              <StatusEmblem key={key} statKey={key} value={player[key]} compact />
+            ))}
           </div>
         </div>
 
-        <div className="panel environment-panel">
+        <div className="panel environment-panel left-column">
           <div className="panel-title">生存提示</div>
           <div className="survival-notes">
             <SurvivalRule title="昼夜" text="夜晚会持续拉低理智与体力，生火与休息更关键。" />
@@ -127,114 +127,158 @@ function App() {
             <SurvivalRule title="背包" text="先点选一个物品，再点另一个格子就能重新摆放。" />
           </div>
         </div>
-      </section>
 
-      {activeEvent && (
-        <section className="event-panel panel">
-          <div className="panel-title">事件</div>
-          <h2>{activeEvent.title}</h2>
-          <p>{activeEvent.description}</p>
-          <div className="event-options">
-            {activeEvent.options.map((option) => (
-              <button key={option.id} type="button" onClick={() => resolveEvent(option.id)}>
-                {option.label}
-              </button>
+        <section className="panel panel-scroll log-column left-column">
+          <div className="panel-title">日志</div>
+          <div className="log-list">
+            {logs.map((log) => (
+              <div key={log.id} className="log-item">
+                {log.text}
+              </div>
             ))}
           </div>
         </section>
-      )}
 
-      <section className="panel backpack-panel">
-        <div className="panel-title">背包</div>
-        <div className="backpack-layout">
-          <div>
-            <div className="backpack-grid">
-              {backpack.map((slot) => {
-                const item = getItemDefinition(slot.itemId);
-                return (
-                  <button
-                    key={slot.slotIndex}
-                    type="button"
-                    className={`backpack-slot ${selectedBackpackSlot === slot.slotIndex ? 'selected' : ''} ${item ? 'filled' : ''}`}
-                    onClick={() => handleSlotClick(slot)}
-                  >
-                    <span className="slot-index">{slot.slotIndex + 1}</span>
-                    {item ? (
-                      <>
-                        <span className="slot-icon">{item.icon}</span>
-                        <span className="slot-amount">x{slot.amount}</span>
-                      </>
-                    ) : (
-                      <span className="slot-empty">空</span>
-                    )}
+        <section className="panel backpack-panel center-column">
+          <div className="panel-title">背包 + 工作台</div>
+          <div className="backpack-layout single-screen">
+            <div>
+              <div className="backpack-grid">
+                {backpack.map((slot) => {
+                  const item = getItemDefinition(slot.itemId);
+                  return (
+                    <button
+                      key={slot.slotIndex}
+                      type="button"
+                      className={`backpack-slot ${selectedBackpackSlot === slot.slotIndex ? 'selected' : ''} ${item ? 'filled' : ''}`}
+                      onClick={() => handleSlotClick(slot)}
+                    >
+                      <span className="slot-index">{slot.slotIndex + 1}</span>
+                      {item ? (
+                        <>
+                          <span className="slot-icon">{item.icon}</span>
+                          <span className="slot-amount">x{slot.amount}</span>
+                        </>
+                      ) : (
+                        <span className="slot-empty">空</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="inventory-detail">
+              <div className="inventory-card">
+                {selectedItem && selectedSlot && selectedSlot.itemId ? (
+                  <>
+                    <div className="inventory-icon">{selectedItem.icon}</div>
+                    <h3>{selectedItem.name}</h3>
+                    <p>{selectedItem.description}</p>
+                    <div className="inventory-meta">
+                      <span>数量 x{selectedSlot.amount}</span>
+                      <span>类型 {selectedItem.type}</span>
+                    </div>
+                    <div className="inventory-actions">
+                      <button type="button" onClick={() => useBackpackItem(selectedSlot.slotIndex)}>
+                        使用
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => discardBackpackItem(selectedSlot.slotIndex)}
+                      >
+                        丢弃
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="inventory-icon empty">🎒</div>
+                    <h3>选择一个背包格子</h3>
+                    <p>已选中的物品可以被使用或丢弃；再次点击其他格子可以交换位置。</p>
+                  </>
+                )}
+              </div>
+
+              <div className="crafting-panel panel-scroll">
+                <h3>工作台合成</h3>
+                <p className="crafting-note">配方会直接消耗背包材料并把结果放回背包。</p>
+                <div className="crafting-list">
+                  {allCraftingRecipes.map((recipe) => {
+                    const canCraft = canCraftInBackpack(backpack, recipe);
+                    return (
+                      <div key={recipe.id} className="crafting-item">
+                        <div>
+                          <strong>{recipe.name}</strong>
+                          <p>{recipe.description}</p>
+                          <div className="crafting-meta">
+                            <span>
+                              材料：
+                              {recipe.requires
+                                .map(
+                                  (entry) =>
+                                    `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`,
+                                )
+                                .join(' + ')}
+                            </span>
+                            <span>
+                              产出：
+                              {recipe.produces
+                                .map(
+                                  (entry) =>
+                                    `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`,
+                                )
+                                .join(' + ')}
+                            </span>
+                          </div>
+                        </div>
+                        <button type="button" disabled={!canCraft} onClick={() => craftRecipe(recipe.id)}>
+                          {canCraft ? '合成' : '材料不足'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="right-column">
+          {activeEvent && (
+            <section className="event-panel panel">
+              <div className="panel-title">事件</div>
+              <h2>{activeEvent.title}</h2>
+              <p>{activeEvent.description}</p>
+              <div className="event-options">
+                {activeEvent.options.map((option) => (
+                  <button key={option.id} type="button" onClick={() => resolveEvent(option.id)}>
+                    {option.label}
                   </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="panel hand-panel panel-scroll">
+            <div className="panel-title">手牌</div>
+            <div className="card-row compact">
+              {hand.map((card) => {
+                const disabled = !meetsCondition(player, environment, card.condition);
+                return (
+                  <CardCanvas
+                    key={card.id}
+                    card={card}
+                    compact
+                    disabled={disabled}
+                    onClick={() => useCard(card.id)}
+                  />
                 );
               })}
             </div>
-          </div>
-
-          <div className="inventory-detail">
-            <div className="inventory-card">
-              {selectedItem && selectedSlot && selectedSlot.itemId ? (
-                <>
-                  <div className="inventory-icon">{selectedItem.icon}</div>
-                  <h3>{selectedItem.name}</h3>
-                  <p>{selectedItem.description}</p>
-                  <div className="inventory-meta">
-                    <span>数量 x{selectedSlot.amount}</span>
-                    <span>类型 {selectedItem.type}</span>
-                  </div>
-                  <div className="inventory-actions">
-                    <button type="button" onClick={() => useBackpackItem(selectedSlot.slotIndex)}>
-                      使用
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => discardBackpackItem(selectedSlot.slotIndex)}
-                    >
-                      丢弃
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="inventory-icon empty">🎒</div>
-                  <h3>选择一个背包格子</h3>
-                  <p>已选中的物品可以被使用或丢弃；再次点击其他格子可以交换位置。</p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">手牌</div>
-        <div className="card-row">
-          {hand.map((card) => {
-            const disabled = !meetsCondition(player, environment, card.condition);
-            return (
-              <CardCanvas
-                key={card.id}
-                card={card}
-                disabled={disabled}
-                onClick={() => useCard(card.id)}
-              />
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="panel">
-        <div className="panel-title">日志</div>
-        <div className="log-list">
-          {logs.map((log) => (
-            <div key={log.id} className="log-item">
-              {log.text}
-            </div>
-          ))}
-        </div>
+          </section>
+        </section>
       </section>
     </main>
   );

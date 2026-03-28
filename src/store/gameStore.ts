@@ -64,7 +64,7 @@ interface GameState {
 const MAX_STAT = 100;
 const MIN_STAT = 0;
 const HAND_SIZE = 4;
-const BACKPACK_SIZE = 16;
+const BACKPACK_SIZE = 12;
 const TOTAL_DAYS = 7;
 const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
 const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
@@ -1841,7 +1841,6 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
-
 
 
 

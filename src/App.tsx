@@ -1,5 +1,4 @@
 ﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
-import { CardCanvas } from './components/CardCanvas';
 import {
   allCraftingRecipes,
   allPrototypeGoals,
@@ -57,6 +56,12 @@ const itemTypeLabel = {
   food: '食物',
   water: '饮水',
   medical: '药品',
+} as const;
+
+const terrainActionContext = {
+  beach: '海滩：可以游泳放松、翻找潮汐带或处理椰子。',
+  jungle: '丛林：更容易获取木材与纤维，但也更消耗体力。',
+  cave: '洞穴：高风险高回报，适合采矿与探索。',
 } as const;
 
 const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
@@ -118,6 +123,10 @@ function App() {
   );
   const [stackProgress, setStackProgress] = useState(0);
   const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
+
+  const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
+    null,
+  );
 
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
@@ -212,6 +221,9 @@ function App() {
     return hints;
   }, [workbench, workbenchVisualCards]);
   const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
+
+  const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
+
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {
@@ -780,7 +792,10 @@ function App() {
                 key={terrain}
                 type="button"
                 className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
-                onClick={() => setTerrain(terrain)}
+                onClick={() => {
+                  setTerrain(terrain);
+                  setSelectedActionTerrain(terrain);
+                }}
               >
                 <span className={`terrain-dot t-${terrain}`} />
                 <span className="terrain-name">{terrainLabel[terrain]}</span>
@@ -854,23 +869,55 @@ function App() {
               <div className="hand-label">当前手牌</div>
               <div className="hand-count">{hand.length} 张</div>
             </div>
-            {hand.map((card) => {
-              const actionCost = card.actionCost ?? 1;
-              const disabled =
-                !meetsCondition(player, environment, card.condition) ||
-                !!activeEvent ||
-                !!ending ||
-                environment.actionsRemaining < actionCost;
-              return (
-                <div key={card.id} className="hand-card-wrap">
-                  <CardCanvas card={card} disabled={disabled} onClick={() => useCard(card.id)} />
-                  <div className="hand-card-meta">
-                    <div className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</div>
-                    <div className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</div>
-                  </div>
+
+            <div className="action-option-panel">
+              <div className="action-option-head">
+                <div className="action-option-title">
+                  {selectedActionTerrain ? `${terrainLabel[selectedActionTerrain]}行动选项` : '先点击地点再行动'}
                 </div>
-              );
-            })}
+                <div className="action-option-sub">
+                  {selectedActionTerrain ? terrainActionContext[selectedActionTerrain] : '点击右侧“地形”中的地点后，才会激活这里的行动按钮。'}
+                </div>
+              </div>
+
+              <div className="action-option-grid">
+                {hand.map((card) => {
+                  const actionCost = card.actionCost ?? 1;
+                  const disabled =
+                    !actionOptionsEnabled ||
+                    !meetsCondition(player, environment, card.condition) ||
+                    !!activeEvent ||
+                    !!ending ||
+                    environment.actionsRemaining < actionCost;
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={`action-option ${disabled ? 'disabled' : ''}`}
+                      disabled={disabled}
+                      onClick={() => useCard(card.id)}
+                    >
+                      <span className="action-option-name">{card.name}</span>
+                      <span className="action-option-desc">{card.description}</span>
+                      <span className="action-option-meta">
+                        <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
+                        <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+                {hand.length === 0 && (
+                  <div className="action-option-empty">当前没有可执行的行动卡。</div>
+                )}
+                {!actionOptionsEnabled && selectedActionTerrain && (
+                  <div className="action-option-empty">请先把当前地点切换到 {terrainLabel[selectedActionTerrain]}。</div>
+                )}
+                {!selectedActionTerrain && (
+                  <div className="action-option-empty">先点击右侧地点，再从这里选择行动。</div>
+                )}
+              </div>
+            </div>
+
           </div>
         </section>
       </main>

@@ -254,9 +254,6 @@ function App() {
   const activeTerrainCards = terrainEncounterCards[activeTerrain];
 
 
-  const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
-
-
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {

@@ -153,11 +153,6 @@ function App() {
 
   const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
 
-
-  const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
-    null,
-  );
-
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
   const selectedBackpackItem = getItemDefinition(selectedBackpackSlotData?.itemId ?? null);

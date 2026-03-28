@@ -57,7 +57,7 @@ button {
 
 .game-shell {
   display: grid;
-  grid-template-rows: 54px minmax(0, 1fr) 188px;
+  grid-template-rows: 54px minmax(0, 1fr);
   grid-template-columns: 208px minmax(0, 1fr) 220px;
   min-height: 100vh;
   background:
@@ -437,8 +437,61 @@ button {
 .panel-field {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
   min-width: 0;
   background: var(--night);
+}
+
+.location-lane {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.location-card {
+  flex: 0 0 140px;
+  min-height: 96px;
+  border-radius: 4px;
+  border: 1px solid rgba(180, 160, 110, 0.22);
+  background: linear-gradient(180deg, rgba(38, 53, 36, 0.95), rgba(24, 31, 24, 0.98));
+  color: var(--parch);
+  padding: 10px;
+  display: grid;
+  align-content: space-between;
+  text-align: left;
+}
+
+.location-card.main {
+  border-color: rgba(201, 168, 76, 0.45);
+  background: linear-gradient(180deg, rgba(42, 54, 67, 0.96), rgba(24, 29, 38, 0.98));
+}
+
+.location-card.main.selected {
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.2);
+}
+
+.location-card.action {
+  border-color: rgba(122, 176, 111, 0.45);
+}
+
+.location-card.action.active {
+  background: linear-gradient(180deg, rgba(45, 70, 45, 0.95), rgba(25, 37, 26, 0.98));
+}
+
+.location-card.child,
+.location-card.object {
+  background: linear-gradient(180deg, rgba(34, 44, 28, 0.92), rgba(19, 24, 16, 0.98));
+}
+
+.location-title {
+  font-size: 18px;
+  color: #dca264;
+}
+
+.location-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
 }
 
 .scene-strip {
@@ -582,6 +635,35 @@ button {
   grid-template-rows: auto auto 1fr auto;
   gap: 10px;
   min-height: 0;
+  border: 1px solid rgba(180, 160, 110, 0.12);
+  border-radius: 8px;
+}
+
+.field-backpack-row {
+  border: 1px solid rgba(180, 160, 110, 0.15);
+  border-radius: 8px;
+  background: rgba(18, 22, 30, 0.94);
+  padding: 8px 10px 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.field-backpack-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.field-backpack-grid {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.field-backpack-grid .backpack-card {
+  flex: 0 0 104px;
+  min-height: 94px;
 }
 
 .workspace-header {
@@ -1053,6 +1135,8 @@ button {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+
+
 
   overflow: hidden;
   padding-bottom: 2px;
@@ -1641,7 +1725,7 @@ body {
   width: min(100vw, 1920px);
   height: min(100vh, 1080px);
   margin: 0 auto;
-  grid-template-rows: 62px minmax(0, 1fr) 228px;
+  grid-template-rows: 62px minmax(0, 1fr);
   grid-template-columns: 248px minmax(0, 1fr) 320px;
   min-height: 0;
   overflow: hidden;
@@ -1700,6 +1784,7 @@ body {
   gap: 10px;
   padding: 12px 18px 14px;
   overflow: hidden;
+
 
 
   border-top: 1px solid rgba(180, 160, 110, 0.1);

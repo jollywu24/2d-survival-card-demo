@@ -64,6 +64,31 @@ const terrainActionContext = {
   cave: '洞穴：高风险高回报，适合采矿与探索。',
 } as const;
 
+const terrainEncounterCards: Record<
+  EnvironmentState['terrain'],
+  { main: string; action: string; children: string[]; objects: string[] }
+> = {
+  beach: {
+    main: '海湾',
+    action: '随便逛逛',
+    children: ['沙滩', '大海'],
+    objects: ['棕榈树', '小棕树', '野生芦苇'],
+  },
+  jungle: {
+    main: '河畔林隙',
+    action: '沿岸探索',
+    children: ['浅滩', '灌木区'],
+    objects: ['树根', '藤蔓', '蘑菇'],
+  },
+  cave: {
+    main: '洞口营地',
+    action: '深入探路',
+    children: ['洞口', '暗河'],
+    objects: ['钟乳石', '湿苔', '碎矿石'],
+  },
+};
+
+
 const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
 const CARD_STACK_OFFSET_X = 12;
 const CARD_STACK_OFFSET_Y = 8;
@@ -122,7 +147,9 @@ function App() {
     null,
   );
   const [stackProgress, setStackProgress] = useState(0);
+
   const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
+
 
   const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
     null,
@@ -223,6 +250,12 @@ function App() {
   const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
 
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
+  const activeTerrain = selectedActionTerrain ?? environment.terrain;
+  const activeTerrainCards = terrainEncounterCards[activeTerrain];
+=======
+
+  const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
+
 
 
   const canStackOnCard = (targetCardId: string) => {
@@ -383,6 +416,17 @@ function App() {
     event.stopPropagation();
     clearStackHold();
     setDragSource(null);
+  };
+
+  const handleExploreTerrain = () => {
+    if (!actionOptionsEnabled || hand.length === 0) {
+      return;
+    }
+    const randomCard = hand[Math.floor(Math.random() * hand.length)];
+    if (!randomCard) {
+      return;
+    }
+    useCard(randomCard.id);
   };
 
   const renderBackpackCard = (slot: BackpackSlot) => {
@@ -572,31 +616,75 @@ function App() {
         </aside>
 
         <section className="panel-field">
-          <div className={`scene-strip terrain-${environment.terrain} weather-${environment.weather}`}>
-            <div className="scene-tint" />
-            <div className="horizon" />
-            <div className="terrain-svg">
-              <div className={`terrain-silhouette silhouette-${environment.terrain}`} />
-            </div>
-            {(environment.weather === 'rain' || environment.weather === 'storm') && (
-              <div className="rain-container">
-                {Array.from({ length: environment.weather === 'storm' ? 22 : 14 }, (_, index) => (
-                  <span
-                    key={index}
-                    className="particle"
-                    style={
-                      {
-                        '--left': `${(index * 7) % 100}%`,
-                        '--delay': `${(index % 6) * 0.14}s`,
-                        '--duration': `${0.8 + (index % 5) * 0.12}s`,
-                      } as CSSProperties
-                    }
-                  />
-                ))}
+          <div className="location-lane">
+            <button
+              type="button"
+              className={`location-card main ${selectedActionTerrain ? 'selected' : ''}`}
+              onClick={() => setSelectedActionTerrain(environment.terrain)}
+            >
+              <span className="location-title">{activeTerrainCards.main}</span>
+              <span className="location-meta">{terrainLabel[activeTerrain]} · 主地点</span>
+            </button>
+            <button
+              type="button"
+              className={`location-card action ${actionOptionsEnabled ? 'active' : ''}`}
+              onClick={handleExploreTerrain}
+              disabled={!actionOptionsEnabled || hand.length === 0 || !!activeEvent || !!ending}
+            >
+              <span className="location-title">{activeTerrainCards.action}</span>
+              <span className="location-meta">点击后随机执行一张行动卡</span>
+            </button>
+            {activeTerrainCards.children.map((entry) => (
+              <div key={entry} className="location-card child">
+                <span className="location-title">{entry}</span>
+                <span className="location-meta">子地点</span>
               </div>
-            )}
-            <div className="terrain-label">{terrainLabel[environment.terrain]}</div>
-            {activeEvent && <div className="event-banner">危机逼近：{activeEvent.title}</div>}
+            ))}
+            {activeTerrainCards.objects.map((entry) => (
+              <div key={entry} className="location-card object">
+                <span className="location-title">{entry}</span>
+                <span className="location-meta">子物件</span>
+              </div>
+            ))}
+          </div>
+          <div className="action-option-panel">
+            <div className="action-option-head">
+              <div className="action-option-title">
+                {selectedActionTerrain ? `${terrainLabel[selectedActionTerrain]}行动选项` : '先点击地点再行动'}
+              </div>
+              <div className="action-option-sub">
+                {selectedActionTerrain
+                  ? terrainActionContext[selectedActionTerrain]
+                  : '点击上方第 1 张地点卡后，才会激活这里的行动按钮。'}
+              </div>
+            </div>
+            <div className="action-option-grid">
+              {hand.map((card) => {
+                const actionCost = card.actionCost ?? 1;
+                const disabled =
+                  !actionOptionsEnabled ||
+                  !meetsCondition(player, environment, card.condition) ||
+                  !!activeEvent ||
+                  !!ending ||
+                  environment.actionsRemaining < actionCost;
+                return (
+                  <button
+                    key={card.id}
+                    type="button"
+                    className={`action-option ${disabled ? 'disabled' : ''}`}
+                    disabled={disabled}
+                    onClick={() => useCard(card.id)}
+                  >
+                    <span className="action-option-name">{card.name}</span>
+                    <span className="action-option-desc">{card.description}</span>
+                    <span className="action-option-meta">
+                      <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
+                      <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="card-workspace">
@@ -782,6 +870,16 @@ function App() {
               </div>
             </div>
           </div>
+
+          <div className="field-backpack-row">
+            <div className="field-backpack-head">
+              <span>背包（仅此区域会随你离开主地点）</span>
+              <span>
+                已占用 {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
+              </span>
+            </div>
+            <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+          </div>
         </section>
 
         <aside className="panel-info">
@@ -833,6 +931,7 @@ function App() {
             </div>
           </div>
         </aside>
+
 
         <section className="panel-hand">
           <div className={`panel-backpack-quick ${quickBackpackOpen ? 'open' : 'collapsed'}`}>
@@ -920,6 +1019,7 @@ function App() {
 
           </div>
         </section>
+
       </main>
 
       <div className={`journal-overlay ${journalOpen ? 'open' : ''}`} onClick={() => setJournalOpen(false)}>

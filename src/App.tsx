@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
-import { CardCanvas } from './components/CardCanvas';
 import {
+  allCraftingRecipes,
   allPrototypeGoals,
+  canCraftInBackpack,
   getItemDefinition,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
@@ -55,6 +56,12 @@ const itemTypeLabel = {
   food: '食物',
   water: '饮水',
   medical: '药品',
+} as const;
+
+const terrainActionContext = {
+  beach: '海滩：可以游泳放松、翻找潮汐带或处理椰子。',
+  jungle: '丛林：更容易获取木材与纤维，但也更消耗体力。',
+  cave: '洞穴：高风险高回报，适合采矿与探索。',
 } as const;
 
 const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
@@ -115,6 +122,10 @@ function App() {
     null,
   );
   const [stackProgress, setStackProgress] = useState(0);
+  const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
+  const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
+    null,
+  );
 
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
@@ -139,6 +150,10 @@ function App() {
     [selectedWorkbenchCard, selectedWorkbenchStack],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
+  const craftableBackpackRecipes = useMemo(
+    () => allCraftingRecipes.filter((recipe) => canCraftInBackpack(backpack, recipe)),
+    [backpack],
+  );
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
   );
@@ -189,6 +204,23 @@ function App() {
 
     return visuals.sort((left, right) => left.y - right.y || left.x - right.x || left.order - right.order);
   }, [workbench]);
+  const workbenchCraftHints = useMemo(() => {
+    const seen = new Set<string>();
+    const hints: Array<{ stackId: string; recipeId: string; recipeName: string }> = [];
+
+    workbenchVisualCards.forEach((card) => {
+      const recipe = getWorkbenchRecipePreview(workbench, card.id);
+      if (!recipe || seen.has(recipe.id)) {
+        return;
+      }
+      seen.add(recipe.id);
+      hints.push({ stackId: card.stackId, recipeId: recipe.id, recipeName: recipe.name });
+    });
+
+    return hints;
+  }, [workbench, workbenchVisualCards]);
+  const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
+  const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {
@@ -571,6 +603,16 @@ function App() {
                 <div className="workspace-subtitle">
                   开出来的卡会横向排开。拖住一张卡悬停到另一张卡上，环形进度条走满才会真正堆叠；移开即可取消。
                 </div>
+                {activeWorkbenchHint && (
+                  <div className="workbench-craft-hint">
+                    <span className="hint-icon">🔨</span>
+                    <span>可合成：{activeWorkbenchHint.recipeName}</span>
+                    <span className="hint-progress">
+                      {workbenchCraftHints.length}/{allCraftingRecipes.length}
+                    </span>
+                    {workbenchCraftHints.length > 1 && <span>+{workbenchCraftHints.length - 1}</span>}
+                  </div>
+                )}
               </div>
               <button type="button" className="btn-subtle" onClick={storeAllWorkbenchItems}>
                 收回台面
@@ -747,7 +789,10 @@ function App() {
                 key={terrain}
                 type="button"
                 className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
-                onClick={() => setTerrain(terrain)}
+                onClick={() => {
+                  setTerrain(terrain);
+                  setSelectedActionTerrain(terrain);
+                }}
               >
                 <span className={`terrain-dot t-${terrain}`} />
                 <span className="terrain-name">{terrainLabel[terrain]}</span>
@@ -770,7 +815,7 @@ function App() {
 
           <div className="info-section">
             <div className="info-head">背包</div>
-            <div className="backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+            <div className="info-text-muted">背包快捷栏已移动到底部行动卡上方。</div>
           </div>
 
           <div className="info-section">
@@ -787,27 +832,88 @@ function App() {
         </aside>
 
         <section className="panel-hand">
-          <div className="hand-head">
-            <div className="hand-label">当前手牌</div>
-            <div className="hand-count">{hand.length} 张</div>
+          <div className={`panel-backpack-quick ${quickBackpackOpen ? 'open' : 'collapsed'}`}>
+            <div className="quickbar-head">
+              <div className="quickbar-title">
+                <span>背包快捷栏</span>
+                <span className="quickbar-count">
+                  {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
+                </span>
+              </div>
+              <div className="quickbar-actions">
+                {craftableBackpackRecipes.length > 0 && (
+                  <div className="quickbar-craftable">
+                    可做 {craftableBackpackRecipes[0].name}
+                    {craftableBackpackRecipes.length > 1 && ` +${craftableBackpackRecipes.length - 1}`}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="btn-subtle quickbar-toggle"
+                  onClick={() => setQuickBackpackOpen((open) => !open)}
+                >
+                  {quickBackpackOpen ? '收起' : '展开'}
+                </button>
+              </div>
+            </div>
+            {quickBackpackOpen && (
+              <div className="quickbar-row">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+            )}
           </div>
-          {hand.map((card) => {
-            const actionCost = card.actionCost ?? 1;
-            const disabled =
-              !meetsCondition(player, environment, card.condition) ||
-              !!activeEvent ||
-              !!ending ||
-              environment.actionsRemaining < actionCost;
-            return (
-              <div key={card.id} className="hand-card-wrap">
-                <CardCanvas card={card} disabled={disabled} onClick={() => useCard(card.id)} />
-                <div className="hand-card-meta">
-                  <div className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</div>
-                  <div className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</div>
+
+          <div className="hand-strip">
+            <div className="hand-head">
+              <div className="hand-label">当前手牌</div>
+              <div className="hand-count">{hand.length} 张</div>
+            </div>
+            <div className="action-option-panel">
+              <div className="action-option-head">
+                <div className="action-option-title">
+                  {selectedActionTerrain ? `${terrainLabel[selectedActionTerrain]}行动选项` : '先点击地点再行动'}
+                </div>
+                <div className="action-option-sub">
+                  {selectedActionTerrain ? terrainActionContext[selectedActionTerrain] : '点击右侧“地形”中的地点后，才会激活这里的行动按钮。'}
                 </div>
               </div>
-            );
-          })}
+
+              <div className="action-option-grid">
+                {hand.map((card) => {
+                  const actionCost = card.actionCost ?? 1;
+                  const disabled =
+                    !actionOptionsEnabled ||
+                    !meetsCondition(player, environment, card.condition) ||
+                    !!activeEvent ||
+                    !!ending ||
+                    environment.actionsRemaining < actionCost;
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={`action-option ${disabled ? 'disabled' : ''}`}
+                      disabled={disabled}
+                      onClick={() => useCard(card.id)}
+                    >
+                      <span className="action-option-name">{card.name}</span>
+                      <span className="action-option-desc">{card.description}</span>
+                      <span className="action-option-meta">
+                        <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
+                        <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+                {hand.length === 0 && (
+                  <div className="action-option-empty">当前没有可执行的行动卡。</div>
+                )}
+                {!actionOptionsEnabled && selectedActionTerrain && (
+                  <div className="action-option-empty">请先把当前地点切换到 {terrainLabel[selectedActionTerrain]}。</div>
+                )}
+                {!selectedActionTerrain && (
+                  <div className="action-option-empty">先点击右侧地点，再从这里选择行动。</div>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
       </main>
 

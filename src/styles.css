@@ -869,6 +869,12 @@ button {
   border-bottom: none;
 }
 
+.info-text-muted {
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .terrain-chip {
   width: 100%;
   display: flex;
@@ -956,11 +962,11 @@ button {
 
 .panel-hand {
   grid-column: 1 / -1;
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   padding: 12px 16px 14px;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   background: rgba(22, 29, 39, 0.96);
   border-top: 1px solid rgba(180, 160, 110, 0.12);
@@ -969,6 +975,87 @@ button {
 
 .panel-hand::-webkit-scrollbar {
   display: none;
+}
+
+.panel-backpack-quick {
+  display: grid;
+  gap: 8px;
+}
+
+.quickbar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.quickbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--parch-mid);
+}
+
+.quickbar-count {
+  color: var(--sand);
+  font-size: 10px;
+}
+
+.quickbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quickbar-craftable {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: #a5d99a;
+  border: 1px solid rgba(122, 176, 111, 0.45);
+  background: rgba(44, 74, 41, 0.52);
+  white-space: nowrap;
+}
+
+.quickbar-toggle {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.quickbar-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.quickbar-row .backpack-card {
+  flex: 0 0 108px;
+  min-height: 92px;
+}
+
+.quickbar-row .item-card-icon {
+  margin-top: 2px;
+  font-size: 20px;
+}
+
+.quickbar-row .item-card-name {
+  font-size: 10px;
+}
+
+.quickbar-row .item-card-type {
+  font-size: 8px;
+}
+
+.hand-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 2px;
 }
 
 .hand-head {
@@ -1064,6 +1151,32 @@ button {
 .type-skill {
   background: rgba(107, 74, 139, 0.35);
   color: #aa88cc;
+}
+
+.workbench-craft-hint {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  background: rgba(53, 42, 23, 0.72);
+  color: #e8d7a7;
+  font-size: 11px;
+}
+
+.hint-icon {
+  font-size: 12px;
+}
+
+.hint-progress {
+  margin-left: 2px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 168, 76, 0.48);
+  font-size: 10px;
+  color: #f3e4bf;
 }
 
 .journal-overlay,
@@ -1500,14 +1613,33 @@ body {
 }
 
 .panel-hand {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
   padding: 12px 18px 14px;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: hidden;
+
   border-top: 1px solid rgba(180, 160, 110, 0.1);
   background: rgba(12, 16, 21, 0.95);
+}
+
+.panel-backpack-quick {
+  gap: 7px;
+}
+
+.quickbar-row {
+  gap: 10px;
+  padding-bottom: 6px;
+}
+
+.quickbar-row .backpack-card {
+  flex-basis: 112px;
+  min-height: 90px;
+}
+
+.hand-strip {
+  gap: 12px;
 }
 
 .hand-head {

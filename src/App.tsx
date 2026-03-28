@@ -252,7 +252,7 @@ function App() {
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
   const activeTerrain = selectedActionTerrain ?? environment.terrain;
   const activeTerrainCards = terrainEncounterCards[activeTerrain];
-=======
+
 
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
 

@@ -150,8 +150,7 @@ function App() {
   const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
     null,
   );
-
-  const [quickBackpackOpen, setQuickBackpackOpen] = useState(true);
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
 
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
@@ -632,7 +631,10 @@ function App() {
             <button
               type="button"
               className={`location-card main ${selectedActionTerrain ? 'selected' : ''}`}
-              onClick={() => setSelectedActionTerrain(environment.terrain)}
+              onClick={() => {
+                setSelectedActionTerrain(environment.terrain);
+                setLocationModalOpen(true);
+              }}
             >
               <span className="location-title">{activeTerrainCards.main}</span>
               <span className="location-meta">{terrainLabel[activeTerrain]} · 主地点</span>
@@ -659,46 +661,6 @@ function App() {
               </div>
             ))}
           </div>
-          <div className="action-option-panel">
-            <div className="action-option-head">
-              <div className="action-option-title">
-                {selectedActionTerrain ? `${terrainLabel[selectedActionTerrain]}行动选项` : '先点击地点再行动'}
-              </div>
-              <div className="action-option-sub">
-                {selectedActionTerrain
-                  ? terrainActionContext[selectedActionTerrain]
-                  : '点击上方第 1 张地点卡后，才会激活这里的行动按钮。'}
-              </div>
-            </div>
-            <div className="action-option-grid">
-              {hand.map((card) => {
-                const actionCost = card.actionCost ?? 1;
-                const disabled =
-                  !actionOptionsEnabled ||
-                  !meetsCondition(player, environment, card.condition) ||
-                  !!activeEvent ||
-                  !!ending ||
-                  environment.actionsRemaining < actionCost;
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    className={`action-option ${disabled ? 'disabled' : ''}`}
-                    disabled={disabled}
-                    onClick={() => useCard(card.id)}
-                  >
-                    <span className="action-option-name">{card.name}</span>
-                    <span className="action-option-desc">{card.description}</span>
-                    <span className="action-option-meta">
-                      <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
-                      <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           <div className="card-workspace">
             <div className="workspace-header">
               <div>
@@ -922,6 +884,50 @@ function App() {
           </div>
         </aside>
       </main>
+
+      <div className={`location-action-modal ${locationModalOpen ? 'open' : ''}`} onClick={() => setLocationModalOpen(false)}>
+        <div className="location-action-sheet" onClick={(event) => event.stopPropagation()}>
+          <div className="location-action-hero">
+            <div className="location-action-title">{activeTerrainCards.main}</div>
+            <div className="location-action-sub">
+              {selectedActionTerrain ? terrainActionContext[selectedActionTerrain] : '选择地点后行动'}
+            </div>
+          </div>
+          <div className="location-action-list">
+            {hand.map((card) => {
+              const actionCost = card.actionCost ?? 1;
+              const disabled =
+                !actionOptionsEnabled ||
+                !meetsCondition(player, environment, card.condition) ||
+                !!activeEvent ||
+                !!ending ||
+                environment.actionsRemaining < actionCost;
+              return (
+                <button
+                  key={`modal-${card.id}`}
+                  type="button"
+                  className={`action-option ${disabled ? 'disabled' : ''}`}
+                  disabled={disabled}
+                  onClick={() => {
+                    useCard(card.id);
+                    setLocationModalOpen(false);
+                  }}
+                >
+                  <span className="action-option-name">{card.name}</span>
+                  <span className="action-option-desc">{card.description}</span>
+                  <span className="action-option-meta">
+                    <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
+                    <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" className="location-action-close" onClick={() => setLocationModalOpen(false)}>
+            关闭
+          </button>
+        </div>
+      </div>
 
       <div className={`journal-overlay ${journalOpen ? 'open' : ''}`} onClick={() => setJournalOpen(false)}>
         <div className="journal-book" onClick={(event) => event.stopPropagation()}>

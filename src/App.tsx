@@ -123,7 +123,6 @@ function App() {
     moveWorkbenchStack,
     storeAllWorkbenchItems,
     useBackpackItem,
-    useWorkbenchItem,
     discardBackpackItem,
     exploreTerrainDrops,
     craftWorkbenchRecipe,
@@ -161,13 +160,6 @@ function App() {
         ? workbench.filter((card) => card.stackId === selectedWorkbenchCard.stackId)
         : [],
     [selectedWorkbenchCard, workbench],
-  );
-  const selectedWorkbenchSameItemCount = useMemo(
-    () =>
-      selectedWorkbenchCard
-        ? selectedWorkbenchStack.filter((card) => card.itemId === selectedWorkbenchCard.itemId).length
-        : 0,
-    [selectedWorkbenchCard, selectedWorkbenchStack],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
   const craftableBackpackRecipes = useMemo(
@@ -776,56 +768,7 @@ function App() {
                     )}
                   </>
                 ) : (
-                  <>
-                    <div className="recipe-line">先选中一张工作台上的卡，预览只针对当前堆叠。</div>
-                    <div className="recipe-line subtle">
-                      不会自动合成。必须先形成卡堆，再手动点击按钮结算。
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="selected-paper">
-                {selectedWorkbenchCard && selectedWorkbenchItem ? (
-                  <>
-                    <div className="paper-kicker">工作台卡</div>
-                    <h3>{selectedWorkbenchItem.name}</h3>
-                    <p>{selectedWorkbenchItem.description}</p>
-                    <div className="paper-meta">
-                      <span>所在卡堆 {selectedWorkbenchStack.length} 张</span>
-                      <span>同名 x{selectedWorkbenchSameItemCount}</span>
-                      <span>类型 {itemTypeLabel[selectedWorkbenchItem.type]}</span>
-                    </div>
-                    <div className="paper-actions">
-                      {selectedWorkbenchItem.effect && (
-                        <button
-                          type="button"
-                          className="btn-paper"
-                          disabled={!!activeEvent || !!ending}
-                          onClick={() => useWorkbenchItem(selectedWorkbenchCard.id)}
-                        >
-                          直接使用
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="btn-paper secondary-ink"
-                        onClick={() => moveWorkbenchToBackpack(selectedWorkbenchCard.id)}
-                      >
-                        收回背包
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="paper-kicker">工作札记</div>
-                    <h3>{selectedBackpackItem ? '背包卡详情已移动到右侧栏' : '先摆开，再叠上去'}</h3>
-                    <p>
-                      {selectedBackpackItem
-                        ? '你可以在右侧直接查看描述、耐久/占比与负重，并进行使用或丢弃。'
-                        : '选择一张工作台卡后可在这里预览当前卡堆并进行手动合成。'}
-                    </p>
-                  </>
+                  <div className="recipe-line">先选中一张工作台上的卡，预览只针对当前堆叠。</div>
                 )}
               </div>
             </div>

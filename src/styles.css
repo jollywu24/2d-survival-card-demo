@@ -2338,6 +2338,15 @@ body {
 .workspace-bottom {
   position: relative;
   z-index: 60;
+  grid-template-columns: 1fr;
+}
+
+.field-backpack-row {
+  margin-top: 8px;
+}
+
+.card-workspace {
+  margin-bottom: 8px;
 }
 
 .carry-line {

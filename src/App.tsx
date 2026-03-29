@@ -1,33 +1,30 @@
 ﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
-import { CardCanvas } from './components/CardCanvas';
 import {
+  allCraftingRecipes,
   allPrototypeGoals,
+  backpackMaxWeight,
+  canCraftInBackpack,
+  getBackpackCurrentWeight,
   getItemDefinition,
+  getItemCarryWeight,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
-  meetsCondition,
   terrainLabel,
   timeLabel,
   useGameStore,
   weatherLabel,
 } from './store/gameStore';
-import type { BackpackSlot, EnvironmentState, StatKey, WorkbenchCard } from './types/game';
+import { InfoSidebar } from './components/InfoSidebar';
+import type { BackpackSlot, EnvironmentState, WorkbenchCard } from './types/game';
 
-const coreNeedMeta: Array<{
-  key: Extract<StatKey, 'hunger' | 'thirst' | 'temperature' | 'sanity'>;
-  label: string;
-  className: string;
-}> = [
-  { key: 'hunger', label: '饱腹', className: 'n-hunger' },
-  { key: 'thirst', label: '水分', className: 'n-water' },
-  { key: 'temperature', label: '体温', className: 'n-temp' },
-  { key: 'sanity', label: '精神', className: 'n-mind' },
-];
-
-const bodyMeta: Array<{ key: Extract<StatKey, 'health' | 'fatigue'>; label: string }> = [
-  { key: 'health', label: '生命' },
-  { key: 'fatigue', label: '疲劳' },
-];
+const survivalOrbMeta = [
+  { key: 'hunger', label: '饱腹', cls: 'orb-hunger', invert: false },
+  { key: 'thirst', label: '水分', cls: 'orb-thirst', invert: false },
+  { key: 'fatigue', label: '精力', cls: 'orb-energy', invert: true },
+  { key: 'health', label: '生命', cls: 'orb-health', invert: false },
+  { key: 'sanity', label: '精神', cls: 'orb-sanity', invert: false },
+  { key: 'temperature', label: '体温', cls: 'orb-temp', invert: false },
+] as const;
 
 const weatherIcon: Record<EnvironmentState['weather'], string> = {
   sunny: '☀',
@@ -36,17 +33,9 @@ const weatherIcon: Record<EnvironmentState['weather'], string> = {
 };
 
 const phaseLabel = {
-  day: '白昼',
+  day: '白天',
   dusk: '黄昏',
   night: '深夜',
-} as const;
-
-const cardTypeLabel = {
-  action: '行动',
-  resource: '资源',
-  recipe: '配方',
-  event: '事件',
-  skill: '技能',
 } as const;
 
 const itemTypeLabel = {
@@ -56,13 +45,48 @@ const itemTypeLabel = {
   water: '饮水',
   medical: '药品',
 } as const;
+const phaseMinuteRange = {
+  day: { start: 6 * 60, length: 12 * 60 },
+  dusk: { start: 18 * 60, length: 4 * 60 },
+  night: { start: 22 * 60, length: 8 * 60 },
+} as const;
+
+const terrainActionContext = {
+  beach: '海滩：可以游泳放松、翻找潮汐带或处理椰子。',
+  jungle: '丛林：更容易获取木材与纤维，但也更消耗体力。',
+  cave: '洞穴：高风险高回报，适合采矿与探索。',
+} as const;
+
+const terrainEncounterCards: Record<
+  EnvironmentState['terrain'],
+  { main: string; action: string; children: string[]; objects: string[] }
+> = {
+  beach: {
+    main: '海湾',
+    action: '随便逛逛',
+    children: ['沙滩', '大海'],
+    objects: ['棕榈树', '小棕树', '野生芦苇'],
+  },
+  jungle: {
+    main: '河畔林隙',
+    action: '沿岸探索',
+    children: ['浅滩', '灌木区'],
+    objects: ['树根', '藤蔓', '蘑菇'],
+  },
+  cave: {
+    main: '洞口营地',
+    action: '深入探路',
+    children: ['洞口', '暗河'],
+    objects: ['钟乳石', '湿苔', '碎矿石'],
+  },
+};
 
 const DEFAULT_WORKBENCH_DROP = { x: 28, y: 28 };
 const CARD_STACK_OFFSET_X = 12;
 const CARD_STACK_OFFSET_Y = 8;
 const WORKBENCH_CARD_WIDTH = 120;
 const WORKBENCH_CARD_HEIGHT = 84;
-const STACK_HOLD_MS = 700;
+const STACK_HOLD_MS = 500;
 
 interface WorkbenchVisualCard {
   id: string;
@@ -80,7 +104,6 @@ function App() {
     player,
     environment,
     progress,
-    hand,
     backpack,
     workbench,
     selectedBackpackSlot,
@@ -88,7 +111,7 @@ function App() {
     activeEvent,
     ending,
     logs,
-    nextTurn,
+    sleepAndAdvance,
     resetGame,
     resolveEvent,
     setTerrain,
@@ -100,10 +123,9 @@ function App() {
     moveWorkbenchStack,
     storeAllWorkbenchItems,
     useBackpackItem,
-    useWorkbenchItem,
     discardBackpackItem,
+    exploreTerrainDrops,
     craftWorkbenchRecipe,
-    useCard,
   } = useGameStore();
   const [journalOpen, setJournalOpen] = useState(false);
   const [dragSource, setDragSource] = useState<
@@ -115,10 +137,18 @@ function App() {
     null,
   );
   const [stackProgress, setStackProgress] = useState(0);
+  const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
+    null,
+  );
+  const [locationModalOpen, setLocationModalOpen] = useState(false);
 
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
   const selectedBackpackItem = getItemDefinition(selectedBackpackSlotData?.itemId ?? null);
+  const selectedBackpackUnitWeight = getItemCarryWeight(selectedBackpackSlotData?.itemId ?? null);
+  const selectedBackpackTotalWeight = selectedBackpackSlotData?.itemId
+    ? selectedBackpackUnitWeight * selectedBackpackSlotData.amount
+    : 0;
   const selectedWorkbenchCard =
     selectedWorkbenchCardId !== null
       ? workbench.find((card) => card.id === selectedWorkbenchCardId) ?? null
@@ -131,27 +161,42 @@ function App() {
         : [],
     [selectedWorkbenchCard, workbench],
   );
-  const selectedWorkbenchSameItemCount = useMemo(
-    () =>
-      selectedWorkbenchCard
-        ? selectedWorkbenchStack.filter((card) => card.itemId === selectedWorkbenchCard.itemId).length
-        : 0,
-    [selectedWorkbenchCard, selectedWorkbenchStack],
-  );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
+  const craftableBackpackRecipes = useMemo(
+    () => allCraftingRecipes.filter((recipe) => canCraftInBackpack(backpack, recipe)),
+    [backpack],
+  );
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
   );
   const completedGoalCount = allPrototypeGoals.filter((goal) =>
     isPrototypeGoalComplete(goal, player, progress),
   ).length;
-  const energyPips = useMemo(
+  const timeSnapshot = useMemo(() => {
+    const range = phaseMinuteRange[environment.timeOfDay];
+    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
+    const absoluteMinutes = (range.start + elapsed) % (24 * 60);
+    const hh = String(Math.floor(absoluteMinutes / 60)).padStart(2, '0');
+    const mm = String(absoluteMinutes % 60).padStart(2, '0');
+    return {
+      currentClockText: `${hh}:${mm}`,
+      totalMinutes: absoluteMinutes,
+      phaseRemainingMinutes: environment.actionsRemaining,
+    };
+  }, [environment.actionsRemaining, environment.timeOfDay]);
+  const clockHandAngle = (timeSnapshot.totalMinutes / (24 * 60)) * 360 - 90;
+  const survivalOrbs = useMemo(
     () =>
-      Array.from(
-        { length: environment.actionLimit },
-        (_, index) => index < environment.actionsRemaining,
-      ),
-    [environment.actionLimit, environment.actionsRemaining],
+      survivalOrbMeta.map((entry) => {
+        const raw = player[entry.key];
+        const value = entry.invert ? 100 - raw : raw;
+        const safeValue = Math.max(0, Math.min(100, value));
+        return {
+          ...entry,
+          value: safeValue,
+        };
+      }),
+    [player],
   );
 
   const workbenchVisualCards = useMemo(() => {
@@ -189,6 +234,28 @@ function App() {
 
     return visuals.sort((left, right) => left.y - right.y || left.x - right.x || left.order - right.order);
   }, [workbench]);
+  const workbenchCraftHints = useMemo(() => {
+    const seen = new Set<string>();
+    const hints: Array<{ stackId: string; recipeId: string; recipeName: string }> = [];
+
+    workbenchVisualCards.forEach((card) => {
+      const recipe = getWorkbenchRecipePreview(workbench, card.id);
+      if (!recipe || seen.has(recipe.id)) {
+        return;
+      }
+      seen.add(recipe.id);
+      hints.push({ stackId: card.stackId, recipeId: recipe.id, recipeName: recipe.name });
+    });
+
+    return hints;
+  }, [workbench, workbenchVisualCards]);
+  const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
+  const backpackWeight = getBackpackCurrentWeight(backpack);
+
+  const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
+  const activeTerrain = selectedActionTerrain ?? environment.terrain;
+  const activeTerrainCards = terrainEncounterCards[activeTerrain];
+
 
   const canStackOnCard = (targetCardId: string) => {
     if (!dragSource) {
@@ -350,6 +417,13 @@ function App() {
     setDragSource(null);
   };
 
+  const handleExploreTerrain = () => {
+    if (!actionOptionsEnabled || !!activeEvent || !!ending) {
+      return;
+    }
+    exploreTerrainDrops(activeTerrain);
+  };
+
   const renderBackpackCard = (slot: BackpackSlot) => {
     const item = getItemDefinition(slot.itemId);
     return (
@@ -464,14 +538,9 @@ function App() {
       <main className="game-shell">
         <header className="top-bar">
           <div className="game-title">
-            荒野求生：漂流者
+            漂流者
             <span>storm journal prototype</span>
           </div>
-          <div className="day-counter">
-            <span className="day-label">Day</span>
-            <span className="day-num">{environment.day}</span>
-          </div>
-          <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
           <div className="top-right">
             <div className="weather-box">
               <span className="weather-icon">{weatherIcon[environment.weather]}</span>
@@ -483,47 +552,63 @@ function App() {
             <button type="button" className="btn-journal" onClick={resetGame}>
               重开
             </button>
-            <button type="button" className="btn-end-day" onClick={nextTurn}>
-              推进阶段
+            <button type="button" className="btn-end-day" onClick={sleepAndAdvance}>
+              主动休息
             </button>
           </div>
         </header>
 
         <aside className="panel-needs">
           <div className="panel-label">生存刻痕</div>
-          {coreNeedMeta.map((need) => {
-            const value = player[need.key];
-            const status = getNeedStatus(need.key, value);
-            return (
-              <div key={need.key} className={`need-row ${need.className}`}>
-                <div className="need-header">
-                  <div className="need-name">
-                    <span className="need-dot" />
-                    <span>{need.label}</span>
-                  </div>
-                  <div className="need-val">{Math.round(value)}</div>
-                </div>
-                <div className="need-track">
-                  <div
-                    className={`need-fill ${status.level === 'crit' ? 'critical' : ''}`}
-                    style={{ width: `${value}%` }}
-                  />
-                </div>
-                <div className={`need-status ${status.level}`}>{status.text}</div>
-              </div>
-            );
-          })}
+          <div className="dst-clock-panel">
+            <div className="dst-clock-face">
+              <svg viewBox="0 0 120 120" className="dst-clock-svg" aria-label="clock">
+                <defs>
+                  <radialGradient id="clockCore" cx="50%" cy="40%" r="68%">
+                    <stop offset="0%" stopColor="#f2e5bf" />
+                    <stop offset="100%" stopColor="#b99345" />
+                  </radialGradient>
+                </defs>
+                <circle cx="60" cy="60" r="56" className="clock-ring" />
+                <path d="M60 60 L60 8 A52 52 0 0 1 60 112 Z" className="clock-day" />
+                <path d="M60 60 L60 112 A52 52 0 0 1 15 34 Z" className="clock-dusk" />
+                <path d="M60 60 L15 34 A52 52 0 0 1 60 8 Z" className="clock-night" />
+                <circle cx="60" cy="60" r="30" fill="url(#clockCore)" />
+                <line
+                  x1="60"
+                  y1="60"
+                  x2={60 + Math.cos((clockHandAngle * Math.PI) / 180) * 34}
+                  y2={60 + Math.sin((clockHandAngle * Math.PI) / 180) * 34}
+                  className="clock-hand"
+                />
+                <circle cx="60" cy="60" r="4" className="clock-pin" />
+                <text x="60" y="56" textAnchor="middle" className="clock-day-text">
+                  Day
+                </text>
+                <text x="60" y="70" textAnchor="middle" className="clock-day-num-text">
+                  {environment.day}
+                </text>
+              </svg>
+            </div>
+            <div className="dst-digital-clock">
+              {timeSnapshot.currentClockText} · {phaseLabel[environment.timeOfDay]}
+            </div>
+            <div className={`time-period tp-${environment.timeOfDay}`}>
+              剩余 {timeSnapshot.phaseRemainingMinutes} 分钟
+            </div>
+          </div>
 
-          <div className="energy-block">
-            <div className="panel-label compact">行动余量</div>
-            <div className="energy-pips">
-              {energyPips.map((active, index) => (
-                <div key={index} className={`pip ${active ? 'active' : 'used'}`} />
-              ))}
-            </div>
-            <div className="energy-label">
-              {environment.actionsRemaining} / {environment.actionLimit} 可用行动
-            </div>
+          <div className="orb-grid">
+            {survivalOrbs.map((orb) => (
+              <div key={orb.key} className={`survival-orb ${orb.cls}`}>
+                <div className="orb-ring">
+                  <div className="orb-fill" style={{ height: `${orb.value}%` }} />
+                  <div className="orb-core" />
+                </div>
+                <div className="orb-label">{orb.label}</div>
+                <div className="orb-value">{Math.round(orb.value)}</div>
+              </div>
+            ))}
           </div>
 
           <div className="left-note">
@@ -537,49 +622,75 @@ function App() {
         </aside>
 
         <section className="panel-field">
-          <div className={`scene-strip terrain-${environment.terrain} weather-${environment.weather}`}>
-            <div className="scene-tint" />
-            <div className="horizon" />
-            <div className="terrain-svg">
-              <div className={`terrain-silhouette silhouette-${environment.terrain}`} />
-            </div>
-            {(environment.weather === 'rain' || environment.weather === 'storm') && (
-              <div className="rain-container">
-                {Array.from({ length: environment.weather === 'storm' ? 22 : 14 }, (_, index) => (
-                  <span
-                    key={index}
-                    className="particle"
-                    style={
-                      {
-                        '--left': `${(index * 7) % 100}%`,
-                        '--delay': `${(index % 6) * 0.14}s`,
-                        '--duration': `${0.8 + (index % 5) * 0.12}s`,
-                      } as CSSProperties
-                    }
-                  />
-                ))}
-              </div>
-            )}
-            <div className="terrain-label">{terrainLabel[environment.terrain]}</div>
-            {activeEvent && <div className="event-banner">危机逼近：{activeEvent.title}</div>}
+          <div className="row-head">
+            <span className="row-head-label">地点</span>
+          </div>
+          <div className="terrain-switch">
+            {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
+              <button
+                key={`top-terrain-${terrain}`}
+                type="button"
+                className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
+                onClick={() => {
+                  setTerrain(terrain);
+                  setSelectedActionTerrain(terrain);
+                }}
+              >
+                <span className={`terrain-dot t-${terrain}`} />
+                <span className="terrain-name">{terrainLabel[terrain]}</span>
+              </button>
+            ))}
           </div>
 
+          <div className="location-lane">
+            <button
+              type="button"
+              className={`location-card main ${selectedActionTerrain ? 'selected' : ''}`}
+              onClick={() => {
+                setSelectedActionTerrain(environment.terrain);
+                setLocationModalOpen(true);
+              }}
+            >
+              <span className="location-title">{activeTerrainCards.main}</span>
+              <span className="location-meta">{terrainLabel[activeTerrain]} · 主地点</span>
+            </button>
+            {activeTerrainCards.children.map((entry) => (
+              <div key={entry} className="location-card child">
+                <span className="location-title">{entry}</span>
+                <span className="location-meta">子地点</span>
+              </div>
+            ))}
+            {activeTerrainCards.objects.map((entry) => (
+              <div key={entry} className="location-card object">
+                <span className="location-title">{entry}</span>
+                <span className="location-meta">子物件</span>
+              </div>
+            ))}
+          </div>
+          <div className="row-head">
+            <span className="row-head-label">工作区</span>
+          </div>
           <div className="card-workspace">
             <div className="workspace-header">
               <div>
                 <div className="workspace-title">自由工作台</div>
-                <div className="workspace-subtitle">
-                  开出来的卡会横向排开。拖住一张卡悬停到另一张卡上，环形进度条走满才会真正堆叠；移开即可取消。
-                </div>
+                {activeWorkbenchHint && (
+                  <div className="workbench-craft-hint">
+                    <span className="hint-icon">🔨</span>
+                    <span>可合成：{activeWorkbenchHint.recipeName}</span>
+                    <span className="hint-progress">
+                      {workbenchCraftHints.length}/{allCraftingRecipes.length}
+                    </span>
+                    {workbenchCraftHints.length > 1 && <span>+{workbenchCraftHints.length - 1}</span>}
+                  </div>
+                )}
               </div>
               <button type="button" className="btn-subtle" onClick={storeAllWorkbenchItems}>
                 收回台面
               </button>
             </div>
 
-            <div className={`drop-zone ${dragSource ? 'active' : ''}`}>
-              {dragSource ? '拖到空白处摆放，悬停到卡牌上进行堆叠' : '工作台是整片自由区域，不再有固定格子'}
-            </div>
+            <div className={`drop-zone ${dragSource ? 'active' : ''}`} aria-hidden="true" />
 
             <div
               ref={boardRef}
@@ -592,13 +703,6 @@ function App() {
               onClick={() => selectWorkbenchCard(null)}
             >
               {workbenchVisualCards.map((card) => renderWorkbenchCard(card))}
-              {workbenchVisualCards.length === 0 && (
-                <div className="workspace-hint">
-                  这里不再有固定格。
-                  <br />
-                  从背包或行动翻出的物品会分开摆在台面上，再拖去组成卡堆。
-                </div>
-              )}
             </div>
 
             <div className="workspace-bottom">
@@ -650,166 +754,78 @@ function App() {
                     )}
                   </>
                 ) : (
-                  <>
-                    <div className="recipe-line">先选中一张工作台上的卡，预览只针对当前堆叠。</div>
-                    <div className="recipe-line subtle">
-                      不会自动合成。必须先形成卡堆，再手动点击按钮结算。
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="selected-paper">
-                {selectedBackpackItem && selectedBackpackSlotData ? (
-                  <>
-                    <div className="paper-kicker">背包卡</div>
-                    <h3>{selectedBackpackItem.name}</h3>
-                    <p>{selectedBackpackItem.description}</p>
-                    <div className="paper-meta">
-                      <span>数量 x{selectedBackpackSlotData.amount}</span>
-                      <span>类型 {itemTypeLabel[selectedBackpackItem.type]}</span>
-                    </div>
-                    <div className="paper-actions">
-                      {selectedBackpackItem.effect && (
-                        <button
-                          type="button"
-                          className="btn-paper"
-                          disabled={!!activeEvent || !!ending}
-                          onClick={() => useBackpackItem(selectedBackpackSlotData.slotIndex)}
-                        >
-                          使用
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="btn-paper secondary-ink"
-                        disabled={!!ending}
-                        onClick={() => moveBackpackToWorkbench(selectedBackpackSlotData.slotIndex, DEFAULT_WORKBENCH_DROP)}
-                      >
-                        放上工作台
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-paper secondary-ink"
-                        onClick={() => discardBackpackItem(selectedBackpackSlotData.slotIndex)}
-                      >
-                        丢弃
-                      </button>
-                    </div>
-                  </>
-                ) : selectedWorkbenchCard && selectedWorkbenchItem ? (
-                  <>
-                    <div className="paper-kicker">工作台卡</div>
-                    <h3>{selectedWorkbenchItem.name}</h3>
-                    <p>{selectedWorkbenchItem.description}</p>
-                    <div className="paper-meta">
-                      <span>所在卡堆 {selectedWorkbenchStack.length} 张</span>
-                      <span>同名 x{selectedWorkbenchSameItemCount}</span>
-                      <span>类型 {itemTypeLabel[selectedWorkbenchItem.type]}</span>
-                    </div>
-                    <div className="paper-actions">
-                      {selectedWorkbenchItem.effect && (
-                        <button
-                          type="button"
-                          className="btn-paper"
-                          disabled={!!activeEvent || !!ending}
-                          onClick={() => useWorkbenchItem(selectedWorkbenchCard.id)}
-                        >
-                          直接使用
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="btn-paper secondary-ink"
-                        onClick={() => moveWorkbenchToBackpack(selectedWorkbenchCard.id)}
-                      >
-                        收回背包
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="paper-kicker">工作札记</div>
-                    <h3>先摆开，再叠上去</h3>
-                    <p>工作台上的物品会先分开排开。拖住卡牌悬停到目标卡上，环形进度走满才会完成堆叠，过程中随时可以挪开取消。</p>
-                  </>
+                  <div className="recipe-line">先选中一张工作台上的卡，预览只针对当前堆叠。</div>
                 )}
               </div>
             </div>
           </div>
+
+          <div className="row-head">
+            <span className="row-head-label">背包</span>
+            <span className="row-head-note">离开时仅保留背包中的物品</span>
+            <span className="row-head-right">
+              {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
+            </span>
+          </div>
+          <div className="field-backpack-row">
+            <div className="field-backpack-head">
+              <span>背包（仅此区域会随你离开主地点）</span>
+              <span>
+                已占用 {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
+              </span>
+            </div>
+            <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+
+          </div>
         </section>
 
-        <aside className="panel-info">
-          <div className="info-section">
-            <div className="info-head">地形</div>
-            {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
-              <button
-                key={terrain}
-                type="button"
-                className={`terrain-chip ${environment.terrain === terrain ? 'active' : ''}`}
-                onClick={() => setTerrain(terrain)}
-              >
-                <span className={`terrain-dot t-${terrain}`} />
-                <span className="terrain-name">{terrainLabel[terrain]}</span>
-                <span className="terrain-ap">{environment.actionsRemaining} AP</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="info-section">
-            <div className="info-head">身体</div>
-            <div className="body-grid">
-              {bodyMeta.map((entry) => (
-                <div key={entry.key} className="body-chip">
-                  <span>{entry.label}</span>
-                  <strong>{Math.round(player[entry.key])}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="info-section">
-            <div className="info-head">背包</div>
-            <div className="backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
-          </div>
-
-          <div className="info-section">
-            <div className="info-head">最近记录</div>
-            <div className="log-stack">
-              {logs.slice(0, 4).map((log, index) => (
-                <div key={log.id} className={`log-entry ${index === 0 ? 'fresh' : ''}`}>
-                  <span className="log-day">D{environment.day}</span>
-                  {log.text}
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
-
-        <section className="panel-hand">
-          <div className="hand-head">
-            <div className="hand-label">当前手牌</div>
-            <div className="hand-count">{hand.length} 张</div>
-          </div>
-          {hand.map((card) => {
-            const actionCost = card.actionCost ?? 1;
-            const disabled =
-              !meetsCondition(player, environment, card.condition) ||
-              !!activeEvent ||
-              !!ending ||
-              environment.actionsRemaining < actionCost;
-            return (
-              <div key={card.id} className="hand-card-wrap">
-                <CardCanvas card={card} disabled={disabled} onClick={() => useCard(card.id)} />
-                <div className="hand-card-meta">
-                  <div className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</div>
-                  <div className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</div>
-                </div>
-              </div>
-            );
-          })}
-        </section>
+        <InfoSidebar
+          backpackWeight={backpackWeight}
+          backpackMaxWeight={backpackMaxWeight}
+          selectedBackpackItem={selectedBackpackItem}
+          selectedBackpackSlotData={selectedBackpackSlotData}
+          selectedBackpackTotalWeight={selectedBackpackTotalWeight}
+          activeEvent={!!activeEvent}
+          ending={!!ending}
+          onUseBackpackItem={useBackpackItem}
+          onDiscardBackpackItem={discardBackpackItem}
+          logs={logs}
+          day={environment.day}
+        />
       </main>
+
+      <div className={`location-action-modal ${locationModalOpen ? 'open' : ''}`} onClick={() => setLocationModalOpen(false)}>
+        <div className="location-action-sheet" onClick={(event) => event.stopPropagation()}>
+          <div className="location-action-hero">
+            <div className="location-action-title">{activeTerrainCards.main}</div>
+            <div className="location-action-sub">
+              {selectedActionTerrain ? terrainActionContext[selectedActionTerrain] : '选择地点后行动'}
+            </div>
+          </div>
+          <div className="location-action-list">
+            <button
+              type="button"
+              className={`action-option ${!actionOptionsEnabled || !!activeEvent || !!ending ? 'disabled' : ''}`}
+              disabled={!actionOptionsEnabled || !!activeEvent || !!ending}
+              onClick={() => {
+                handleExploreTerrain();
+                setLocationModalOpen(false);
+              }}
+            >
+              <span className="action-option-name">{activeTerrainCards.action}</span>
+              <span className="action-option-desc">随机翻出 3~5 张资源牌到工作台，自动横向分开摆放。</span>
+              <span className="action-option-meta">
+                <span className="time-badge">⏳ {activeTerrain === 'cave' ? 90 : 60} 分钟</span>
+                <span className="hand-card-tag type-action">探索</span>
+                <span className="hand-card-cost">消耗时间与精力</span>
+              </span>
+            </button>
+          </div>
+          <button type="button" className="location-action-close" onClick={() => setLocationModalOpen(false)}>
+            关闭
+          </button>
+        </div>
+      </div>
 
       <div className={`journal-overlay ${journalOpen ? 'open' : ''}`} onClick={() => setJournalOpen(false)}>
         <div className="journal-book" onClick={(event) => event.stopPropagation()}>
@@ -879,33 +895,6 @@ function App() {
       )}
     </>
   );
-}
-
-function getNeedStatus(
-  key: Extract<StatKey, 'hunger' | 'thirst' | 'temperature' | 'sanity'>,
-  value: number,
-) {
-  if (key === 'hunger') {
-    if (value < 25) return { text: '危险 · 明早必须找吃的', level: 'crit' };
-    if (value < 50) return { text: '偏低 · 今天别再硬撑', level: 'warn' };
-    return { text: '尚可 · 还撑得住', level: '' };
-  }
-
-  if (key === 'thirst') {
-    if (value < 25) return { text: '危险 · 身体已经开始报警', level: 'crit' };
-    if (value < 45) return { text: '偏低 · 优先补水', level: 'warn' };
-    return { text: '正常 · 还能继续找资源', level: '' };
-  }
-
-  if (key === 'temperature') {
-    if (value < 30) return { text: '危险 · 已经接近失温', level: 'crit' };
-    if (value < 50) return { text: '偏低 · 黄昏前最好生火', level: 'warn' };
-    return { text: '正常 · 风还扛得住', level: '' };
-  }
-
-  if (value < 30) return { text: '危险 · 不要一个人想太久', level: 'crit' };
-  if (value < 50) return { text: '波动 · 夜里容易崩', level: 'warn' };
-  return { text: '稳定 · 还没有乱掉', level: '' };
 }
 
 export default App;

@@ -205,6 +205,15 @@ function App() {
       }),
     [player],
   );
+  const currentClock = useMemo(() => {
+    const range = phaseMinuteRange[environment.timeOfDay];
+    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
+    const minutes = (range.start + elapsed) % (24 * 60);
+    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mm = String(minutes % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }, [environment.timeOfDay, environment.actionsRemaining]);
+  const phaseRemainingMinutes = environment.actionsRemaining;
 
   const workbenchVisualCards = useMemo(() => {
     const stackMap = new Map<string, WorkbenchCard[]>();
@@ -575,6 +584,11 @@ function App() {
     <>
       <main className="game-shell">
         <header className="top-bar">
+          <div className="clock-wrap" aria-hidden="true">
+            <div className={`clock-core phase-${environment.timeOfDay}`}>
+              <span>{phaseLabel[environment.timeOfDay]}</span>
+            </div>
+          </div>
           <div className="game-title">
             漂流者
             <span>storm journal prototype</span>
@@ -634,6 +648,19 @@ function App() {
             <div className={`time-period tp-${environment.timeOfDay}`}>
               剩余 {timeSnapshot.phaseRemainingMinutes} 分钟
             </div>
+          </div>
+
+          <div className="orb-grid">
+            {survivalOrbs.map((orb) => (
+              <div key={orb.key} className={`survival-orb ${orb.cls}`}>
+                <div className="orb-ring">
+                  <div className="orb-fill" style={{ height: `${orb.value}%` }} />
+                  <div className="orb-core" />
+                </div>
+                <div className="orb-label">{orb.label}</div>
+                <div className="orb-value">{Math.round(orb.value)}</div>
+              </div>
+            ))}
           </div>
 
           <div className="orb-grid">
@@ -879,13 +906,39 @@ function App() {
                 style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
               />
             </div>
-          </div>
+            <div className="carry-track">
+              <div
+                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
+                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="carry-track">
+              <div
+                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
+                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="carry-track">
+              <div
+                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
+                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="carry-track">
+              <div
+                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
+                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
 
           <div className="info-section">
             <div className="info-head">背包选中物品</div>
             {backpackFocusContent}
           </div>
+        </section>
 
+        <aside className="panel-info">
           <div className="info-section">
             <div className="info-head">最近记录</div>
             <div className="log-stack">

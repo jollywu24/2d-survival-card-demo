@@ -14,6 +14,7 @@ import {
   useGameStore,
   weatherLabel,
 } from './store/gameStore';
+import { InfoSidebar } from './components/InfoSidebar';
 import type { BackpackSlot, EnvironmentState, WorkbenchCard } from './types/game';
 
 const survivalOrbMeta = [
@@ -271,37 +272,6 @@ function App() {
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
   const activeTerrain = selectedActionTerrain ?? environment.terrain;
   const activeTerrainCards = terrainEncounterCards[activeTerrain];
-  const backpackFocusContent =
-    selectedBackpackItem && selectedBackpackSlotData ? (
-      <div className="backpack-focus-card">
-        <div className="focus-name">{selectedBackpackItem.name}</div>
-        <p>{selectedBackpackItem.description}</p>
-        <div className="focus-icon">{selectedBackpackItem.icon}</div>
-        <div className="focus-meta">
-          <span>✶ {Math.round((selectedBackpackSlotData.amount / selectedBackpackItem.maxStack) * 100)}%</span>
-          <span>⚖ {selectedBackpackTotalWeight.toFixed(2)} 公斤</span>
-        </div>
-        <div className="paper-actions">
-          <button
-            type="button"
-            className="btn-paper"
-            disabled={!!activeEvent || !!ending || !selectedBackpackItem.effect}
-            onClick={() => useBackpackItem(selectedBackpackSlotData.slotIndex)}
-          >
-            使用
-          </button>
-          <button
-            type="button"
-            className="btn-paper secondary-ink"
-            onClick={() => discardBackpackItem(selectedBackpackSlotData.slotIndex)}
-          >
-            丢弃
-          </button>
-        </div>
-      </div>
-    ) : (
-      <div className="info-empty">先在背包中选择一张卡。</div>
-    );
 
 
   const canStackOnCard = (targetCardId: string) => {
@@ -663,19 +633,6 @@ function App() {
             ))}
           </div>
 
-          <div className="orb-grid">
-            {survivalOrbs.map((orb) => (
-              <div key={orb.key} className={`survival-orb ${orb.cls}`}>
-                <div className="orb-ring">
-                  <div className="orb-fill" style={{ height: `${orb.value}%` }} />
-                  <div className="orb-core" />
-                </div>
-                <div className="orb-label">{orb.label}</div>
-                <div className="orb-value">{Math.round(orb.value)}</div>
-              </div>
-            ))}
-          </div>
-
           <div className="left-note">
             <strong>今日目标</strong>
             <p>{activeGoal?.title ?? '已经抵达 7 天原型终局'}</p>
@@ -893,64 +850,19 @@ function App() {
           </div>
         </section>
 
-        <aside className="panel-info">
-          <div className="info-section">
-            <div className="info-head">背包负重</div>
-            <div className="carry-line">
-              <span>{backpackWeight.toFixed(1)} kg</span>
-              <span>/ {backpackMaxWeight.toFixed(1)} kg</span>
-            </div>
-            <div className="carry-track">
-              <div
-                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
-                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="carry-track">
-              <div
-                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
-                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="carry-track">
-              <div
-                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
-                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="carry-track">
-              <div
-                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
-                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="carry-track">
-              <div
-                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
-                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
-
-          <div className="info-section">
-            <div className="info-head">背包选中物品</div>
-            {backpackFocusContent}
-          </div>
-        </section>
-
-        <aside className="panel-info">
-          <div className="info-section">
-            <div className="info-head">最近记录</div>
-            <div className="log-stack">
-              {logs.slice(0, 4).map((log, index) => (
-                <div key={log.id} className={`log-entry ${index === 0 ? 'fresh' : ''}`}>
-                  <span className="log-day">D{environment.day}</span>
-                  {log.text}
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
+        <InfoSidebar
+          backpackWeight={backpackWeight}
+          backpackMaxWeight={backpackMaxWeight}
+          selectedBackpackItem={selectedBackpackItem}
+          selectedBackpackSlotData={selectedBackpackSlotData}
+          selectedBackpackTotalWeight={selectedBackpackTotalWeight}
+          activeEvent={!!activeEvent}
+          ending={!!ending}
+          onUseBackpackItem={useBackpackItem}
+          onDiscardBackpackItem={discardBackpackItem}
+          logs={logs}
+          day={environment.day}
+        />
       </main>
 
       <div className={`location-action-modal ${locationModalOpen ? 'open' : ''}`} onClick={() => setLocationModalOpen(false)}>

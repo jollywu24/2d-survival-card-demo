@@ -632,6 +632,19 @@ function App() {
             ))}
           </div>
 
+          <div className="orb-grid">
+            {survivalOrbs.map((orb) => (
+              <div key={orb.key} className={`survival-orb ${orb.cls}`}>
+                <div className="orb-ring">
+                  <div className="orb-fill" style={{ height: `${orb.value}%` }} />
+                  <div className="orb-core" />
+                </div>
+                <div className="orb-label">{orb.label}</div>
+                <div className="orb-value">{Math.round(orb.value)}</div>
+              </div>
+            ))}
+          </div>
+
           <div className="left-note">
             <strong>今日目标</strong>
             <p>{activeGoal?.title ?? '已经抵达 7 天原型终局'}</p>
@@ -868,6 +881,12 @@ function App() {
                 style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
               />
             </div>
+            <div className="carry-track">
+              <div
+                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
+                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
+              />
+            </div>
             <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
 
           <div className="info-section">
@@ -879,7 +898,7 @@ function App() {
                 <div className="focus-icon">{selectedBackpackItem.icon}</div>
                 <div className="focus-meta">
                   <span>✶ {Math.round((selectedBackpackSlotData.amount / selectedBackpackItem.maxStack) * 100)}%</span>
-                  <span>⚖ {(selectedBackpackTotalWeight).toFixed(2)} 公斤</span>
+                  <span>⚖ {selectedBackpackTotalWeight.toFixed(2)} 公斤</span>
                 </div>
                 <div className="paper-actions">
                   {selectedBackpackItem.effect && (

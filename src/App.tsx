@@ -172,21 +172,19 @@ function App() {
   const completedGoalCount = allPrototypeGoals.filter((goal) =>
     isPrototypeGoalComplete(goal, player, progress),
   ).length;
-  const currentClock = useMemo(() => {
+  const timeSnapshot = useMemo(() => {
     const range = phaseMinuteRange[environment.timeOfDay];
     const elapsed = Math.max(0, range.length - environment.actionsRemaining);
-    const minutes = (range.start + elapsed) % (24 * 60);
-    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
-    const mm = String(minutes % 60).padStart(2, '0');
-    return `${hh}:${mm}`;
-  }, [environment.timeOfDay, environment.actionsRemaining]);
-  const phaseRemainingMinutes = environment.actionsRemaining;
-  const totalMinutes = useMemo(() => {
-    const range = phaseMinuteRange[environment.timeOfDay];
-    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
-    return (range.start + elapsed) % (24 * 60);
+    const absoluteMinutes = (range.start + elapsed) % (24 * 60);
+    const hh = String(Math.floor(absoluteMinutes / 60)).padStart(2, '0');
+    const mm = String(absoluteMinutes % 60).padStart(2, '0');
+    return {
+      currentClockText: `${hh}:${mm}`,
+      totalMinutes: absoluteMinutes,
+      phaseRemainingMinutes: environment.actionsRemaining,
+    };
   }, [environment.actionsRemaining, environment.timeOfDay]);
-  const clockHandAngle = (totalMinutes / (24 * 60)) * 360 - 90;
+  const clockHandAngle = (timeSnapshot.totalMinutes / (24 * 60)) * 360 - 90;
   const survivalOrbs = useMemo(
     () =>
       survivalOrbMeta.map((entry) => {
@@ -615,9 +613,11 @@ function App() {
               </svg>
             </div>
             <div className="dst-digital-clock">
-              {currentClock} · {phaseLabel[environment.timeOfDay]}
+              {timeSnapshot.currentClockText} · {phaseLabel[environment.timeOfDay]}
             </div>
-            <div className={`time-period tp-${environment.timeOfDay}`}>剩余 {phaseRemainingMinutes} 分钟</div>
+            <div className={`time-period tp-${environment.timeOfDay}`}>
+              剩余 {timeSnapshot.phaseRemainingMinutes} 分钟
+            </div>
           </div>
 
           <div className="orb-grid">

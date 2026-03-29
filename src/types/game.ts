@@ -134,6 +134,7 @@ export interface ItemDefinition {
   type: ItemType;
   icon: string;
   description: string;
+  weight?: number;
   effect?: CardEffect;
   maxStack: number;
   useActionCost?: number;
@@ -172,4 +173,3 @@ export interface LogEntry {
   id: string;
   text: string;
 }
-

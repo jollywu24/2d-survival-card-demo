@@ -55,8 +55,10 @@ interface GameState {
   useBackpackItem: (slotIndex: number) => void;
   useWorkbenchItem: (cardId: string) => void;
   discardBackpackItem: (slotIndex: number) => void;
+  exploreTerrainDrops: (terrain: EnvironmentState['terrain']) => void;
   craftRecipe: (recipeId: string) => void;
   craftWorkbenchRecipe: () => void;
+  sleepAndAdvance: () => void;
   nextTurn: () => void;
   resetGame: () => void;
 }
@@ -64,14 +66,15 @@ interface GameState {
 const MAX_STAT = 100;
 const MIN_STAT = 0;
 const HAND_SIZE = 4;
-const BACKPACK_SIZE = 16;
+const BACKPACK_SIZE = 12;
 const TOTAL_DAYS = 7;
 const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
 const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
-  day: 2,
-  dusk: 1,
-  night: 1,
+  day: 12 * 60,
+  dusk: 4 * 60,
+  night: 8 * 60,
 };
+const TIME_PER_ACTION_POINT = 30;
 const scriptedEventById = new Map(scriptedEvents.map((event) => [event.id, event]));
 
 const itemById = new Map(itemCatalog.map((item) => [item.id, item]));
@@ -1061,11 +1064,36 @@ const getPhaseStatDecay = (
 
 const canAffordAction = (environment: EnvironmentState, cost: number) =>
   environment.actionsRemaining >= cost;
+const toTimeCost = (costPoints: number) => Math.max(TIME_PER_ACTION_POINT, costPoints * TIME_PER_ACTION_POINT);
 
 const spendActions = (environment: EnvironmentState, cost: number): EnvironmentState => ({
   ...environment,
   actionsRemaining: Math.max(0, environment.actionsRemaining - cost),
 });
+
+const applyEffortDrain = (player: PlayerState, timeCost: number) =>
+  applyStatChanges(player, {
+    fatigue: -(timeCost * 7),
+    thirst: -(timeCost * 2),
+    hunger: -(timeCost * 1),
+  });
+
+const applySleepRecovery = (player: PlayerState) =>
+  applyStatChanges(player, {
+    fatigue: 34,
+    sanity: 10,
+    health: 4,
+  });
+const terrainDropPool: Record<EnvironmentState['terrain'], string[]> = {
+  beach: ['green-coconut', 'driftwood', 'pebble', 'palm-leaf', 'fresh-water'],
+  jungle: ['driftwood', 'vine', 'herb', 'bamboo', 'berries'],
+  cave: ['flint', 'stone', 'herb', 'fresh-water', 'pebble'],
+};
+const pickRandomTerrainDrops = (terrain: EnvironmentState['terrain']) => {
+  const pool = terrainDropPool[terrain];
+  const count = 3 + Math.floor(Math.random() * 3);
+  return Array.from({ length: count }, () => pool[Math.floor(Math.random() * pool.length)]);
+};
 
 const phaseSummaryLabel = (phase: EnvironmentState['timeOfDay']) => {
   if (phase === 'day') {
@@ -1098,10 +1126,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const actionCost = card.actionCost ?? 1;
-    if (!canAffordAction(state.environment, actionCost)) {
+    const timeCost = toTimeCost(actionCost);
+    if (!canAffordAction(state.environment, timeCost)) {
       set((current) => ({
         logs: [
-          createLog(`【${card.name}】需要 ${actionCost} 点行动次数，但本阶段只剩 ${state.environment.actionsRemaining} 点。`),
+          createLog(`【${card.name}】需要 ${timeCost} 分钟，但当前时段只剩 ${state.environment.actionsRemaining} 分钟。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1116,7 +1145,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const applied = applyEffect(state.player, state.environment, card.effect);
-    const environmentAfterAction = spendActions(applied.environment, actionCost);
+    const playerAfterEffort = applyEffortDrain(applied.player, actionCost);
+    const environmentAfterAction = spendActions(applied.environment, timeCost);
     const inventoryResult = addItemsToBackpack(state.backpack, card.effect.gainItems);
     const nextWorkbench = addItemsToWorkbench(
       state.workbench,
@@ -1152,7 +1182,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       inventoryResult.overflow.length > 0 ? ` 背包已满，掉落：${inventoryResult.overflow.join('、')}。` : '';
 
     set((current) => ({
-      player: applied.player,
+      player: playerAfterEffort,
       environment: environmentAfterAction,
       progress: nextProgress,
       backpack: inventoryResult.backpack,
@@ -1166,6 +1196,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...current.logs,
       ].slice(0, 10),
     }));
+
+    if (!activeEvent && environmentAfterAction.actionsRemaining <= 0) {
+      get().nextTurn();
+    }
   },
 
   resolveEvent: (optionId) => {
@@ -1453,10 +1487,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const actionCost =
       item.useActionCost ?? (item.type === 'food' || item.type === 'water' ? 0 : 1);
-    if (!canAffordAction(state.environment, actionCost)) {
+    const timeCost = actionCost === 0 ? 0 : toTimeCost(actionCost);
+    if (!canAffordAction(state.environment, timeCost)) {
       set((current) => ({
         logs: [
-          createLog(`本阶段行动次数不足，无法使用【${item.name}】。`),
+          createLog(`本阶段时间不足，无法使用【${item.name}】。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1464,7 +1499,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const applied = applyEffect(state.player, state.environment, item.effect);
-    const environmentAfterAction = spendActions(applied.environment, actionCost);
+    const playerAfterEffort = applyEffortDrain(applied.player, actionCost);
+    const environmentAfterAction = spendActions(applied.environment, timeCost);
     const inventoryResult = addItemsToBackpack(
       consumeOneFromSlot(state.backpack, slotIndex),
       item.effect.gainItems,
@@ -1477,7 +1513,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         : '';
 
     set((current) => ({
-      player: applied.player,
+      player: playerAfterEffort,
       environment: environmentAfterAction,
       progress: {
         ...current.progress,
@@ -1516,10 +1552,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const actionCost =
       item.useActionCost ?? (item.type === 'food' || item.type === 'water' ? 0 : 1);
-    if (!canAffordAction(state.environment, actionCost)) {
+    const timeCost = actionCost === 0 ? 0 : toTimeCost(actionCost);
+    if (!canAffordAction(state.environment, timeCost)) {
       set((current) => ({
         logs: [
-          createLog(`本阶段行动次数不足，无法使用【${item.name}】。`),
+          createLog(`本阶段时间不足，无法使用【${item.name}】。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1527,7 +1564,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const applied = applyEffect(state.player, state.environment, item.effect);
-    const environmentAfterAction = spendActions(applied.environment, actionCost);
+    const playerAfterEffort = applyEffortDrain(applied.player, actionCost);
+    const environmentAfterAction = spendActions(applied.environment, timeCost);
     const nextWorkbench = removeWorkbenchCard(state.workbench, cardId);
     const inventoryResult = addItemsToBackpack(state.backpack, item.effect.gainItems);
     const gainText =
@@ -1538,7 +1576,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         : '';
 
     set((current) => ({
-      player: applied.player,
+      player: playerAfterEffort,
       environment: environmentAfterAction,
       progress: {
         ...current.progress,
@@ -1571,6 +1609,39 @@ export const useGameStore = create<GameState>((set, get) => ({
       logs: [createLog(`你丢弃了【${item?.name ?? '未知物品'}】。`), ...current.logs].slice(0, 10),
     }));
   },
+  exploreTerrainDrops: (terrain) => {
+    const state = get();
+    if (state.ending || state.activeEvent) {
+      return;
+    }
+    const actionCost = terrain === 'cave' ? 3 : terrain === 'jungle' ? 2 : 2;
+    const timeCost = toTimeCost(actionCost);
+    if (!canAffordAction(state.environment, timeCost)) {
+      set((current) => ({
+        logs: [createLog(`本阶段时间不足，无法继续探索${terrainLabel[terrain]}。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+    const drops = pickRandomTerrainDrops(terrain);
+    const dropEntries = drops.map((itemId) => ({ itemId, amount: 1 }));
+    const baseX = 120 + Math.floor(Math.random() * 60);
+    const baseY = 70 + Math.floor(Math.random() * 40);
+    const nextWorkbench = addItemsToWorkbench(
+      state.workbench,
+      dropEntries,
+      { x: baseX, y: baseY },
+    );
+    set((current) => ({
+      environment: spendActions(current.environment, timeCost),
+      player: applyEffortDrain(current.player, actionCost),
+      workbench: nextWorkbench,
+      selectedWorkbenchCardId: nextWorkbench[nextWorkbench.length - 1]?.id ?? null,
+      logs: [
+        createLog(`你探索了${terrainLabel[terrain]}，发现：${drops.map((id) => itemById.get(id)?.name ?? id).join('、')}。`),
+        ...current.logs,
+      ].slice(0, 10),
+    }));
+  },
 
   craftRecipe: (recipeId) => {
     const state = get();
@@ -1597,10 +1668,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const actionCost = 1;
-    if (!canAffordAction(state.environment, actionCost)) {
+    const timeCost = toTimeCost(actionCost);
+    if (!canAffordAction(state.environment, timeCost)) {
       set((current) => ({
         logs: [
-          createLog(`本阶段行动次数不足，无法合成【${recipe.name}】。`),
+          createLog(`本阶段时间不足，无法合成【${recipe.name}】。`),
           ...current.logs,
         ].slice(0, 10),
       }));
@@ -1630,7 +1702,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set((current) => ({
       progress: nextProgress,
-      environment: spendActions(current.environment, actionCost),
+      environment: spendActions(current.environment, timeCost),
+      player: applyEffortDrain(current.player, actionCost),
       backpack: craftedResult.backpack,
       logs: [createLog(`你在工作台合成了【${recipe.name}】：${outputText}。${overflowText}`), ...current.logs].slice(0, 10),
     }));
@@ -1654,6 +1727,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!selectedCard) {
       return;
     }
+    const actionCost = 1;
+    const timeCost = toTimeCost(actionCost);
+    if (!canAffordAction(state.environment, timeCost)) {
+      set((current) => ({
+        logs: [createLog(`本阶段时间不足，无法手动合成【${recipe.name}】。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
 
     const basePosition = { x: selectedCard.x, y: selectedCard.y };
     const nextWorkbenchBase = removeWorkbenchCardsForRecipe(
@@ -1661,14 +1742,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       selectedCard.stackId,
       recipe,
     );
+    const spreadBase = { x: basePosition.x, y: basePosition.y };
     const nextWorkbench = addItemsToWorkbench(
       nextWorkbenchBase,
       recipe.produces,
-      basePosition,
-      selectedCard.stackId,
+      spreadBase,
     );
-    const nextSelectedWorkbenchCardId =
-      nextWorkbench.find((card) => card.stackId === selectedCard.stackId)?.id ?? null;
+    const nextSelectedWorkbenchCardId = nextWorkbench[nextWorkbench.length - 1]?.id ?? null;
     const outputText = recipe.produces
       .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
       .join('、');
@@ -1688,6 +1768,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set((current) => ({
       progress: nextProgress,
+      environment: spendActions(current.environment, timeCost),
+      player: applyEffortDrain(current.player, actionCost),
       backpack: current.backpack,
       workbench: nextWorkbench,
       selectedWorkbenchCardId: nextSelectedWorkbenchCardId,
@@ -1697,6 +1779,23 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...current.logs,
       ].slice(0, 10),
     }));
+  },
+  sleepAndAdvance: () => {
+    const state = get();
+    if (state.ending) {
+      return;
+    }
+    if (state.activeEvent) {
+      set((current) => ({
+        logs: [createLog('当前危机还没有处理，无法安心睡觉。'), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+    set((current) => ({
+      player: applySleepRecovery(current.player),
+      logs: [createLog('你睡了一觉，恢复了不少精力。'), ...current.logs].slice(0, 10),
+    }));
+    get().nextTurn();
   },
   nextTurn: () => {
     const state = get();
@@ -1787,7 +1886,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       ending,
       logs: [
         createLog(
-          `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}，可行动 ${nextEnvironment.actionLimit} 次。`,
+          `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}，当前时段可用 ${nextEnvironment.actionLimit} 分钟。`,
         ),
         ...foreshadowLogs,
         ...scriptedEventLogs,
@@ -1841,16 +1940,3 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
-
-
-
-
-
-
-
-
-
-
-
-
-

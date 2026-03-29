@@ -2339,3 +2339,77 @@ body {
   position: relative;
   z-index: 60;
 }
+
+.carry-line {
+  display: flex;
+  justify-content: space-between;
+  color: #e8d9b0;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.carry-track {
+  height: 8px;
+  border-radius: 99px;
+  border: 1px solid rgba(180, 150, 80, 0.28);
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.carry-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(80, 160, 90, 0.9), rgba(201, 168, 72, 0.92));
+}
+
+.carry-fill.over {
+  background: linear-gradient(90deg, rgba(190, 80, 60, 0.9), rgba(220, 120, 60, 0.9));
+}
+
+.backpack-focus-card {
+  margin-top: 8px;
+  border: 1px solid rgba(180, 150, 80, 0.22);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(10, 16, 20, 0.82), rgba(6, 10, 14, 0.9));
+  padding: 10px;
+}
+
+.focus-name {
+  text-align: center;
+  font-size: 24px;
+  font-family: "Noto Serif SC", serif;
+  margin-bottom: 8px;
+}
+
+.backpack-focus-card p {
+  margin: 0;
+  line-height: 1.6;
+  color: #d2c4a4;
+  min-height: 56px;
+}
+
+.focus-icon {
+  margin: 12px auto;
+  width: 110px;
+  height: 140px;
+  display: grid;
+  place-items: center;
+  font-size: 64px;
+  border-radius: 6px;
+  border: 1px solid rgba(180, 150, 80, 0.2);
+  background: rgba(122, 92, 46, 0.15);
+}
+
+.focus-meta {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 8px 0 12px;
+  font-size: 20px;
+  color: #f0e5c6;
+}
+
+.info-empty {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(180, 160, 110, 0.58);
+}

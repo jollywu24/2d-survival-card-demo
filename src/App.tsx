@@ -2,8 +2,11 @@
 import {
   allCraftingRecipes,
   allPrototypeGoals,
+  backpackMaxWeight,
   canCraftInBackpack,
+  getBackpackCurrentWeight,
   getItemDefinition,
+  getItemCarryWeight,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
   terrainLabel,
@@ -142,6 +145,10 @@ function App() {
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
   const selectedBackpackItem = getItemDefinition(selectedBackpackSlotData?.itemId ?? null);
+  const selectedBackpackUnitWeight = getItemCarryWeight(selectedBackpackSlotData?.itemId ?? null);
+  const selectedBackpackTotalWeight = selectedBackpackSlotData?.itemId
+    ? selectedBackpackUnitWeight * selectedBackpackSlotData.amount
+    : 0;
   const selectedWorkbenchCard =
     selectedWorkbenchCardId !== null
       ? workbench.find((card) => card.id === selectedWorkbenchCardId) ?? null
@@ -259,6 +266,7 @@ function App() {
     return hints;
   }, [workbench, workbenchVisualCards]);
   const activeWorkbenchHint = workbenchCraftHints[0] ?? null;
+  const backpackWeight = getBackpackCurrentWeight(backpack);
 
   const actionOptionsEnabled = selectedActionTerrain === environment.terrain;
   const activeTerrain = selectedActionTerrain ?? environment.terrain;
@@ -624,6 +632,19 @@ function App() {
             ))}
           </div>
 
+          <div className="orb-grid">
+            {survivalOrbs.map((orb) => (
+              <div key={orb.key} className={`survival-orb ${orb.cls}`}>
+                <div className="orb-ring">
+                  <div className="orb-fill" style={{ height: `${orb.value}%` }} />
+                  <div className="orb-core" />
+                </div>
+                <div className="orb-label">{orb.label}</div>
+                <div className="orb-value">{Math.round(orb.value)}</div>
+              </div>
+            ))}
+          </div>
+
           <div className="left-note">
             <strong>今日目标</strong>
             <p>{activeGoal?.title ?? '已经抵达 7 天原型终局'}</p>
@@ -777,44 +798,7 @@ function App() {
               </div>
 
               <div className="selected-paper">
-                {selectedBackpackItem && selectedBackpackSlotData ? (
-                  <>
-                    <div className="paper-kicker">背包卡</div>
-                    <h3>{selectedBackpackItem.name}</h3>
-                    <p>{selectedBackpackItem.description}</p>
-                    <div className="paper-meta">
-                      <span>数量 x{selectedBackpackSlotData.amount}</span>
-                      <span>类型 {itemTypeLabel[selectedBackpackItem.type]}</span>
-                    </div>
-                    <div className="paper-actions">
-                      {selectedBackpackItem.effect && (
-                        <button
-                          type="button"
-                          className="btn-paper"
-                          disabled={!!activeEvent || !!ending}
-                          onClick={() => useBackpackItem(selectedBackpackSlotData.slotIndex)}
-                        >
-                          使用
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="btn-paper secondary-ink"
-                        disabled={!!ending}
-                        onClick={() => moveBackpackToWorkbench(selectedBackpackSlotData.slotIndex, DEFAULT_WORKBENCH_DROP)}
-                      >
-                        放上工作台
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-paper secondary-ink"
-                        onClick={() => discardBackpackItem(selectedBackpackSlotData.slotIndex)}
-                      >
-                        丢弃
-                      </button>
-                    </div>
-                  </>
-                ) : selectedWorkbenchCard && selectedWorkbenchItem ? (
+                {selectedWorkbenchCard && selectedWorkbenchItem ? (
                   <>
                     <div className="paper-kicker">工作台卡</div>
                     <h3>{selectedWorkbenchItem.name}</h3>
@@ -847,8 +831,12 @@ function App() {
                 ) : (
                   <>
                     <div className="paper-kicker">工作札记</div>
-                    <h3>先摆开，再叠上去</h3>
-                    <p>工作台上的物品会先分开排开。拖住卡牌悬停到目标卡上，环形进度走满才会完成堆叠，过程中随时可以挪开取消。</p>
+                    <h3>{selectedBackpackItem ? '背包卡详情已移动到右侧栏' : '先摆开，再叠上去'}</h3>
+                    <p>
+                      {selectedBackpackItem
+                        ? '你可以在右侧直接查看描述、耐久/占比与负重，并进行使用或丢弃。'
+                        : '选择一张工作台卡后可在这里预览当前卡堆并进行手动合成。'}
+                    </p>
                   </>
                 )}
               </div>
@@ -871,6 +859,58 @@ function App() {
             </div>
             <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
 
+          </div>
+        </section>
+
+        <aside className="panel-info">
+          <div className="info-section">
+            <div className="info-head">背包负重</div>
+            <div className="carry-line">
+              <span>{backpackWeight.toFixed(1)} kg</span>
+              <span>/ {backpackMaxWeight.toFixed(1)} kg</span>
+            </div>
+            <div className="carry-track">
+              <div
+                className={`carry-fill ${backpackWeight > backpackMaxWeight ? 'over' : ''}`}
+                style={{ width: `${Math.min((backpackWeight / backpackMaxWeight) * 100, 100)}%` }}
+              />
+            </div>
+            <div className="field-backpack-grid">{backpack.map((slot) => renderBackpackCard(slot))}</div>
+
+          <div className="info-section">
+            <div className="info-head">背包选中物品</div>
+            {selectedBackpackItem && selectedBackpackSlotData ? (
+              <div className="backpack-focus-card">
+                <div className="focus-name">{selectedBackpackItem.name}</div>
+                <p>{selectedBackpackItem.description}</p>
+                <div className="focus-icon">{selectedBackpackItem.icon}</div>
+                <div className="focus-meta">
+                  <span>✶ {Math.round((selectedBackpackSlotData.amount / selectedBackpackItem.maxStack) * 100)}%</span>
+                  <span>⚖ {(selectedBackpackTotalWeight).toFixed(2)} 公斤</span>
+                </div>
+                <div className="paper-actions">
+                  {selectedBackpackItem.effect && (
+                    <button
+                      type="button"
+                      className="btn-paper"
+                      disabled={!!activeEvent || !!ending}
+                      onClick={() => useBackpackItem(selectedBackpackSlotData.slotIndex)}
+                    >
+                      使用
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-paper secondary-ink"
+                    onClick={() => discardBackpackItem(selectedBackpackSlotData.slotIndex)}
+                  >
+                    丢弃
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="info-empty">先在背包中选择一张卡。</div>
+            )}
           </div>
         </section>
 

@@ -67,6 +67,7 @@ const MAX_STAT = 100;
 const MIN_STAT = 0;
 const HAND_SIZE = 4;
 const BACKPACK_SIZE = 12;
+const BACKPACK_MAX_WEIGHT = 18;
 const TOTAL_DAYS = 7;
 const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
 const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
@@ -240,18 +241,42 @@ const createEmptySlot = (slotIndex: number): BackpackSlot => ({
   amount: 0,
 });
 
+const defaultTypeWeight: Record<ItemDefinition['type'], number> = {
+  material: 0.6,
+  tool: 1.2,
+  food: 0.5,
+  water: 0.8,
+  medical: 0.4,
+};
+
+const getItemWeight = (itemId: string) => {
+  const item = itemById.get(itemId);
+  if (!item) return 0;
+  return item.weight ?? defaultTypeWeight[item.type] ?? 0;
+};
+
+const getBackpackWeight = (backpack: BackpackSlot[]) =>
+  backpack.reduce((sum, slot) => {
+    if (!slot.itemId || slot.amount <= 0) {
+      return sum;
+    }
+    return sum + getItemWeight(slot.itemId) * slot.amount;
+  }, 0);
+
 const addItemsToBackpack = (
   backpack: BackpackSlot[],
   gains: ItemStackChange[] = [],
 ): { backpack: BackpackSlot[]; overflow: string[] } => {
   const nextBackpack = cloneBackpack(backpack);
   const overflow: string[] = [];
+  let currentWeight = getBackpackWeight(nextBackpack);
 
   gains.forEach(({ itemId, amount }) => {
     const item = itemById.get(itemId);
     if (!item || amount <= 0) {
       return;
     }
+    const singleWeight = getItemWeight(itemId);
 
     let remaining = amount;
 
@@ -262,10 +287,15 @@ const addItemsToBackpack = (
       if (slot.itemId !== itemId || slot.amount >= item.maxStack) {
         return;
       }
-
-      const canAdd = Math.min(item.maxStack - slot.amount, remaining);
+      const weightLimited =
+        singleWeight > 0 ? Math.floor((BACKPACK_MAX_WEIGHT - currentWeight) / singleWeight) : remaining;
+      const canAdd = Math.min(item.maxStack - slot.amount, remaining, Math.max(weightLimited, 0));
+      if (canAdd <= 0) {
+        return;
+      }
       slot.amount += canAdd;
       remaining -= canAdd;
+      currentWeight += canAdd * singleWeight;
     });
 
     nextBackpack.forEach((slot) => {
@@ -275,11 +305,16 @@ const addItemsToBackpack = (
       if (slot.itemId !== null) {
         return;
       }
-
-      const canAdd = Math.min(item.maxStack, remaining);
+      const weightLimited =
+        singleWeight > 0 ? Math.floor((BACKPACK_MAX_WEIGHT - currentWeight) / singleWeight) : remaining;
+      const canAdd = Math.min(item.maxStack, remaining, Math.max(weightLimited, 0));
+      if (canAdd <= 0) {
+        return;
+      }
       slot.itemId = itemId;
       slot.amount = canAdd;
       remaining -= canAdd;
+      currentWeight += canAdd * singleWeight;
     });
 
     if (remaining > 0) {
@@ -330,6 +365,11 @@ const addSingleUnitToBackpackSlot = (
   const slot = nextBackpack[slotIndex];
 
   if (!slot) {
+    return { backpack: nextBackpack, added: false };
+  }
+  const singleWeight = getItemWeight(itemId);
+  const currentWeight = getBackpackWeight(nextBackpack);
+  if (singleWeight > 0 && currentWeight + singleWeight > BACKPACK_MAX_WEIGHT + 1e-6) {
     return { backpack: nextBackpack, added: false };
   }
 
@@ -1367,7 +1407,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const inserted = addSingleUnitToBackpackSlot(state.backpack, targetIndex, sourceCard.itemId);
     if (!inserted.added) {
       set((current) => ({
-        logs: [createLog('目标背包格无法接收这张卡。'), ...current.logs].slice(0, 10),
+        logs: [createLog('目标背包格无法接收这张卡（可能超出负重或堆叠限制）。'), ...current.logs].slice(0, 10),
       }));
       return;
     }
@@ -1454,7 +1494,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       logs: [
         createLog(
           blockedItems.length > 0
-            ? `工作台已尽量清空，但这些卡没地方放回背包：${blockedItems.join('、')}。`
+            ? `工作台已尽量清空，但这些卡没法放回背包（空间或负重不足）：${blockedItems.join('、')}。`
             : '你把工作台上的卡都收回了背包。',
         ),
         ...current.logs,
@@ -1928,6 +1968,9 @@ export const getItemDefinition = (itemId: string | null): ItemDefinition | null 
 };
 
 export const allCraftingRecipes = craftingRecipes;
+export const backpackMaxWeight = BACKPACK_MAX_WEIGHT;
+export const getBackpackCurrentWeight = (backpack: BackpackSlot[]) => getBackpackWeight(backpack);
+export const getItemCarryWeight = (itemId: string | null) => (itemId ? getItemWeight(itemId) : 0);
 export const canCraftInBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) =>
   canCraftRecipeFromBackpack(backpack, recipe);
 export const getWorkbenchRecipePreview = (

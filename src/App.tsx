@@ -36,7 +36,7 @@ const weatherIcon: Record<EnvironmentState['weather'], string> = {
 };
 
 const phaseLabel = {
-  day: '白昼',
+  day: '白天',
   dusk: '黄昏',
   night: '深夜',
 } as const;
@@ -197,6 +197,7 @@ function App() {
     const mm = String(minutes % 60).padStart(2, '0');
     return `${hh}:${mm}`;
   }, [environment.timeOfDay, environment.actionsRemaining]);
+  const phaseRemainingMinutes = environment.actionsRemaining;
 
   const workbenchVisualCards = useMemo(() => {
     const stackMap = new Map<string, WorkbenchCard[]>();
@@ -535,16 +536,24 @@ function App() {
     <>
       <main className="game-shell">
         <header className="top-bar">
+          <div className="clock-wrap" aria-hidden="true">
+            <div className={`clock-core phase-${environment.timeOfDay}`}>
+              <span>{phaseLabel[environment.timeOfDay]}</span>
+            </div>
+          </div>
           <div className="game-title">
-            荒野求生：漂流者
+            漂流者
             <span>storm journal prototype</span>
           </div>
-          <div className="day-counter">
+          <div className="meta-block day-counter">
             <span className="day-label">Day</span>
             <span className="day-num">{environment.day}</span>
           </div>
-            <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
-            <div className="clock-pill">{currentClock}</div>
+          <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
+          <div className="time-display">
+            <div className="time-clock">{currentClock}</div>
+            <div className={`time-period tp-${environment.timeOfDay}`}>剩余 {phaseRemainingMinutes} 分钟</div>
+          </div>
           <div className="top-right">
             <div className="weather-box">
               <span className="weather-icon">{weatherIcon[environment.weather]}</span>
@@ -610,7 +619,10 @@ function App() {
         </aside>
 
         <section className="panel-field">
-
+          <div className="row-head">
+            <span className="row-head-label">地点</span>
+            <span className="row-head-note">点击主地点进行探索</span>
+          </div>
           <div className="terrain-switch">
             {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
               <button
@@ -652,6 +664,10 @@ function App() {
                 <span className="location-meta">子物件</span>
               </div>
             ))}
+          </div>
+          <div className="row-head">
+            <span className="row-head-label">工作区</span>
+            <span className="row-head-note">拖拽到空白处摆放；悬停叠卡后手动合成</span>
           </div>
           <div className="card-workspace">
             <div className="workspace-header">
@@ -830,7 +846,13 @@ function App() {
             </div>
           </div>
 
-
+          <div className="row-head">
+            <span className="row-head-label">背包</span>
+            <span className="row-head-note">离开时仅保留背包中的物品</span>
+            <span className="row-head-right">
+              {backpack.filter((slot) => !!slot.itemId).length}/{backpack.length}
+            </span>
+          </div>
           <div className="field-backpack-row">
             <div className="field-backpack-head">
               <span>背包（仅此区域会随你离开主地点）</span>
@@ -891,6 +913,7 @@ function App() {
               <span className="action-option-name">{activeTerrainCards.action}</span>
               <span className="action-option-desc">随机翻出 3~5 张资源牌到工作台，自动横向分开摆放。</span>
               <span className="action-option-meta">
+                <span className="time-badge">⏳ {activeTerrain === 'cave' ? 90 : 60} 分钟</span>
                 <span className="hand-card-tag type-action">探索</span>
                 <span className="hand-card-cost">消耗时间与精力</span>
               </span>

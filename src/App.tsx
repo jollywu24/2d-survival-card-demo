@@ -198,6 +198,15 @@ function App() {
       }),
     [player],
   );
+  const currentClock = useMemo(() => {
+    const range = phaseMinuteRange[environment.timeOfDay];
+    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
+    const minutes = (range.start + elapsed) % (24 * 60);
+    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mm = String(minutes % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }, [environment.timeOfDay, environment.actionsRemaining]);
+  const phaseRemainingMinutes = environment.actionsRemaining;
 
   const workbenchVisualCards = useMemo(() => {
     const stackMap = new Map<string, WorkbenchCard[]>();
@@ -536,6 +545,11 @@ function App() {
     <>
       <main className="game-shell">
         <header className="top-bar">
+          <div className="clock-wrap" aria-hidden="true">
+            <div className={`clock-core phase-${environment.timeOfDay}`}>
+              <span>{phaseLabel[environment.timeOfDay]}</span>
+            </div>
+          </div>
           <div className="game-title">
             漂流者
             <span>storm journal prototype</span>

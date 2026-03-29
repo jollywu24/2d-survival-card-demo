@@ -11,23 +11,16 @@ import {
   useGameStore,
   weatherLabel,
 } from './store/gameStore';
-import type { BackpackSlot, EnvironmentState, StatKey, WorkbenchCard } from './types/game';
+import type { BackpackSlot, EnvironmentState, WorkbenchCard } from './types/game';
 
-const coreNeedMeta: Array<{
-  key: Extract<StatKey, 'hunger' | 'thirst' | 'temperature' | 'sanity'>;
-  label: string;
-  className: string;
-}> = [
-  { key: 'hunger', label: '饱腹', className: 'n-hunger' },
-  { key: 'thirst', label: '水分', className: 'n-water' },
-  { key: 'temperature', label: '体温', className: 'n-temp' },
-  { key: 'sanity', label: '精神', className: 'n-mind' },
-];
-
-const bodyMeta: Array<{ key: Extract<StatKey, 'health' | 'fatigue'>; label: string }> = [
-  { key: 'health', label: '生命' },
-  { key: 'fatigue', label: '疲劳' },
-];
+const survivalOrbMeta = [
+  { key: 'hunger', label: '饱腹', cls: 'orb-hunger', invert: false },
+  { key: 'thirst', label: '水分', cls: 'orb-thirst', invert: false },
+  { key: 'fatigue', label: '精力', cls: 'orb-energy', invert: true },
+  { key: 'health', label: '生命', cls: 'orb-health', invert: false },
+  { key: 'sanity', label: '精神', cls: 'orb-sanity', invert: false },
+  { key: 'temperature', label: '体温', cls: 'orb-temp', invert: false },
+] as const;
 
 const weatherIcon: Record<EnvironmentState['weather'], string> = {
   sunny: '☀',
@@ -179,15 +172,33 @@ function App() {
   const completedGoalCount = allPrototypeGoals.filter((goal) =>
     isPrototypeGoalComplete(goal, player, progress),
   ).length;
-  const energyPips = useMemo(
-    () => {
-      const pipCount = 12;
-      const ratio =
-        environment.actionLimit > 0 ? environment.actionsRemaining / environment.actionLimit : 0;
-      const activeCount = Math.round(pipCount * ratio);
-      return Array.from({ length: pipCount }, (_, index) => index < activeCount);
-    },
-    [environment.actionLimit, environment.actionsRemaining],
+  const currentClock = useMemo(() => {
+    const range = phaseMinuteRange[environment.timeOfDay];
+    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
+    const minutes = (range.start + elapsed) % (24 * 60);
+    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mm = String(minutes % 60).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }, [environment.timeOfDay, environment.actionsRemaining]);
+  const phaseRemainingMinutes = environment.actionsRemaining;
+  const totalMinutes = useMemo(() => {
+    const range = phaseMinuteRange[environment.timeOfDay];
+    const elapsed = Math.max(0, range.length - environment.actionsRemaining);
+    return (range.start + elapsed) % (24 * 60);
+  }, [environment.actionsRemaining, environment.timeOfDay]);
+  const clockHandAngle = (totalMinutes / (24 * 60)) * 360 - 90;
+  const survivalOrbs = useMemo(
+    () =>
+      survivalOrbMeta.map((entry) => {
+        const raw = player[entry.key];
+        const value = entry.invert ? 100 - raw : raw;
+        const safeValue = Math.max(0, Math.min(100, value));
+        return {
+          ...entry,
+          value: safeValue,
+        };
+      }),
+    [player],
   );
   const currentClock = useMemo(() => {
     const range = phaseMinuteRange[environment.timeOfDay];
@@ -573,39 +584,53 @@ function App() {
 
         <aside className="panel-needs">
           <div className="panel-label">生存刻痕</div>
-          {coreNeedMeta.map((need) => {
-            const value = player[need.key];
-            const status = getNeedStatus(need.key, value);
-            return (
-              <div key={need.key} className={`need-row ${need.className}`}>
-                <div className="need-header">
-                  <div className="need-name">
-                    <span className="need-dot" />
-                    <span>{need.label}</span>
-                  </div>
-                  <div className="need-val">{Math.round(value)}</div>
-                </div>
-                <div className="need-track">
-                  <div
-                    className={`need-fill ${status.level === 'crit' ? 'critical' : ''}`}
-                    style={{ width: `${value}%` }}
-                  />
-                </div>
-                <div className={`need-status ${status.level}`}>{status.text}</div>
-              </div>
-            );
-          })}
+          <div className="dst-clock-panel">
+            <div className="dst-clock-face">
+              <svg viewBox="0 0 120 120" className="dst-clock-svg" aria-label="clock">
+                <defs>
+                  <radialGradient id="clockCore" cx="50%" cy="40%" r="68%">
+                    <stop offset="0%" stopColor="#f2e5bf" />
+                    <stop offset="100%" stopColor="#b99345" />
+                  </radialGradient>
+                </defs>
+                <circle cx="60" cy="60" r="56" className="clock-ring" />
+                <path d="M60 60 L60 8 A52 52 0 0 1 60 112 Z" className="clock-day" />
+                <path d="M60 60 L60 112 A52 52 0 0 1 15 34 Z" className="clock-dusk" />
+                <path d="M60 60 L15 34 A52 52 0 0 1 60 8 Z" className="clock-night" />
+                <circle cx="60" cy="60" r="30" fill="url(#clockCore)" />
+                <line
+                  x1="60"
+                  y1="60"
+                  x2={60 + Math.cos((clockHandAngle * Math.PI) / 180) * 34}
+                  y2={60 + Math.sin((clockHandAngle * Math.PI) / 180) * 34}
+                  className="clock-hand"
+                />
+                <circle cx="60" cy="60" r="4" className="clock-pin" />
+                <text x="60" y="56" textAnchor="middle" className="clock-day-text">
+                  Day
+                </text>
+                <text x="60" y="70" textAnchor="middle" className="clock-day-num-text">
+                  {environment.day}
+                </text>
+              </svg>
+            </div>
+            <div className="dst-digital-clock">
+              {currentClock} · {phaseLabel[environment.timeOfDay]}
+            </div>
+            <div className={`time-period tp-${environment.timeOfDay}`}>剩余 {phaseRemainingMinutes} 分钟</div>
+          </div>
 
-          <div className="energy-block">
-            <div className="panel-label compact">时间余量</div>
-            <div className="energy-pips">
-              {energyPips.map((active, index) => (
-                <div key={index} className={`pip ${active ? 'active' : 'used'}`} />
-              ))}
-            </div>
-            <div className="energy-label">
-              剩余 {environment.actionsRemaining} 分钟 / 时段总计 {environment.actionLimit} 分钟
-            </div>
+          <div className="orb-grid">
+            {survivalOrbs.map((orb) => (
+              <div key={orb.key} className={`survival-orb ${orb.cls}`}>
+                <div className="orb-ring">
+                  <div className="orb-fill" style={{ height: `${orb.value}%` }} />
+                  <div className="orb-core" />
+                </div>
+                <div className="orb-label">{orb.label}</div>
+                <div className="orb-value">{Math.round(orb.value)}</div>
+              </div>
+            ))}
           </div>
 
           <div className="left-note">
@@ -867,18 +892,6 @@ function App() {
 
         <aside className="panel-info">
           <div className="info-section">
-            <div className="info-head">身体</div>
-            <div className="body-grid">
-              {bodyMeta.map((entry) => (
-                <div key={entry.key} className="body-chip">
-                  <span>{entry.label}</span>
-                  <strong>{Math.round(player[entry.key])}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="info-section">
             <div className="info-head">最近记录</div>
             <div className="log-stack">
               {logs.slice(0, 4).map((log, index) => (
@@ -993,33 +1006,6 @@ function App() {
       )}
     </>
   );
-}
-
-function getNeedStatus(
-  key: Extract<StatKey, 'hunger' | 'thirst' | 'temperature' | 'sanity'>,
-  value: number,
-) {
-  if (key === 'hunger') {
-    if (value < 25) return { text: '危险 · 明早必须找吃的', level: 'crit' };
-    if (value < 50) return { text: '偏低 · 今天别再硬撑', level: 'warn' };
-    return { text: '尚可 · 还撑得住', level: '' };
-  }
-
-  if (key === 'thirst') {
-    if (value < 25) return { text: '危险 · 身体已经开始报警', level: 'crit' };
-    if (value < 45) return { text: '偏低 · 优先补水', level: 'warn' };
-    return { text: '正常 · 还能继续找资源', level: '' };
-  }
-
-  if (key === 'temperature') {
-    if (value < 30) return { text: '危险 · 已经接近失温', level: 'crit' };
-    if (value < 50) return { text: '偏低 · 黄昏前最好生火', level: 'warn' };
-    return { text: '正常 · 风还扛得住', level: '' };
-  }
-
-  if (value < 30) return { text: '危险 · 不要一个人想太久', level: 'crit' };
-  if (value < 50) return { text: '波动 · 夜里容易崩', level: 'warn' };
-  return { text: '稳定 · 还没有乱掉', level: '' };
 }
 
 export default App;

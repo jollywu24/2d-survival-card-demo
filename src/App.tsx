@@ -82,7 +82,7 @@ const CARD_STACK_OFFSET_X = 12;
 const CARD_STACK_OFFSET_Y = 8;
 const WORKBENCH_CARD_WIDTH = 120;
 const WORKBENCH_CARD_HEIGHT = 84;
-const STACK_HOLD_MS = 700;
+const STACK_HOLD_MS = 500;
 
 interface WorkbenchVisualCard {
   id: string;
@@ -554,15 +554,6 @@ function App() {
             漂流者
             <span>storm journal prototype</span>
           </div>
-          <div className="meta-block day-counter">
-            <span className="day-label">Day</span>
-            <span className="day-num">{environment.day}</span>
-          </div>
-          <div className={`phase-badge phase-${environment.timeOfDay}`}>{phaseLabel[environment.timeOfDay]}</div>
-          <div className="time-display">
-            <div className="time-clock">{currentClock}</div>
-            <div className={`time-period tp-${environment.timeOfDay}`}>剩余 {phaseRemainingMinutes} 分钟</div>
-          </div>
           <div className="top-right">
             <div className="weather-box">
               <span className="weather-icon">{weatherIcon[environment.weather]}</span>
@@ -646,7 +637,6 @@ function App() {
         <section className="panel-field">
           <div className="row-head">
             <span className="row-head-label">地点</span>
-            <span className="row-head-note">点击主地点进行探索</span>
           </div>
           <div className="terrain-switch">
             {(['beach', 'jungle', 'cave'] as const).map((terrain) => (
@@ -692,15 +682,11 @@ function App() {
           </div>
           <div className="row-head">
             <span className="row-head-label">工作区</span>
-            <span className="row-head-note">拖拽到空白处摆放；悬停叠卡后手动合成</span>
           </div>
           <div className="card-workspace">
             <div className="workspace-header">
               <div>
                 <div className="workspace-title">自由工作台</div>
-                <div className="workspace-subtitle">
-                  开出来的卡会横向排开。拖住一张卡悬停到另一张卡上，环形进度条走满才会真正堆叠；移开即可取消。
-                </div>
                 {activeWorkbenchHint && (
                   <div className="workbench-craft-hint">
                     <span className="hint-icon">🔨</span>
@@ -717,9 +703,7 @@ function App() {
               </button>
             </div>
 
-            <div className={`drop-zone ${dragSource ? 'active' : ''}`}>
-              {dragSource ? '拖到空白处摆放，悬停到卡牌上进行堆叠' : '工作台是整片自由区域，不再有固定格子'}
-            </div>
+            <div className={`drop-zone ${dragSource ? 'active' : ''}`} aria-hidden="true" />
 
             <div
               ref={boardRef}

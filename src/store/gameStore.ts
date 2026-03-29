@@ -55,6 +55,7 @@ interface GameState {
   useBackpackItem: (slotIndex: number) => void;
   useWorkbenchItem: (cardId: string) => void;
   discardBackpackItem: (slotIndex: number) => void;
+  exploreTerrainDrops: (terrain: EnvironmentState['terrain']) => void;
   craftRecipe: (recipeId: string) => void;
   craftWorkbenchRecipe: () => void;
   sleepAndAdvance: () => void;
@@ -1083,6 +1084,16 @@ const applySleepRecovery = (player: PlayerState) =>
     sanity: 10,
     health: 4,
   });
+const terrainDropPool: Record<EnvironmentState['terrain'], string[]> = {
+  beach: ['green-coconut', 'driftwood', 'pebble', 'palm-leaf', 'fresh-water'],
+  jungle: ['driftwood', 'vine', 'herb', 'bamboo', 'berries'],
+  cave: ['flint', 'stone', 'herb', 'fresh-water', 'pebble'],
+};
+const pickRandomTerrainDrops = (terrain: EnvironmentState['terrain']) => {
+  const pool = terrainDropPool[terrain];
+  const count = 3 + Math.floor(Math.random() * 3);
+  return Array.from({ length: count }, () => pool[Math.floor(Math.random() * pool.length)]);
+};
 
 const phaseSummaryLabel = (phase: EnvironmentState['timeOfDay']) => {
   if (phase === 'day') {
@@ -1598,6 +1609,39 @@ export const useGameStore = create<GameState>((set, get) => ({
       logs: [createLog(`你丢弃了【${item?.name ?? '未知物品'}】。`), ...current.logs].slice(0, 10),
     }));
   },
+  exploreTerrainDrops: (terrain) => {
+    const state = get();
+    if (state.ending || state.activeEvent) {
+      return;
+    }
+    const actionCost = terrain === 'cave' ? 3 : terrain === 'jungle' ? 2 : 2;
+    const timeCost = toTimeCost(actionCost);
+    if (!canAffordAction(state.environment, timeCost)) {
+      set((current) => ({
+        logs: [createLog(`本阶段时间不足，无法继续探索${terrainLabel[terrain]}。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+    const drops = pickRandomTerrainDrops(terrain);
+    const dropEntries = drops.map((itemId) => ({ itemId, amount: 1 }));
+    const baseX = 120 + Math.floor(Math.random() * 60);
+    const baseY = 70 + Math.floor(Math.random() * 40);
+    const nextWorkbench = addItemsToWorkbench(
+      state.workbench,
+      dropEntries,
+      { x: baseX, y: baseY },
+    );
+    set((current) => ({
+      environment: spendActions(current.environment, timeCost),
+      player: applyEffortDrain(current.player, actionCost),
+      workbench: nextWorkbench,
+      selectedWorkbenchCardId: nextWorkbench[nextWorkbench.length - 1]?.id ?? null,
+      logs: [
+        createLog(`你探索了${terrainLabel[terrain]}，发现：${drops.map((id) => itemById.get(id)?.name ?? id).join('、')}。`),
+        ...current.logs,
+      ].slice(0, 10),
+    }));
+  },
 
   craftRecipe: (recipeId) => {
     const state = get();
@@ -1698,14 +1742,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       selectedCard.stackId,
       recipe,
     );
+    const spreadBase = { x: basePosition.x, y: basePosition.y };
     const nextWorkbench = addItemsToWorkbench(
       nextWorkbenchBase,
       recipe.produces,
-      basePosition,
-      selectedCard.stackId,
+      spreadBase,
     );
-    const nextSelectedWorkbenchCardId =
-      nextWorkbench.find((card) => card.stackId === selectedCard.stackId)?.id ?? null;
+    const nextSelectedWorkbenchCardId = nextWorkbench[nextWorkbench.length - 1]?.id ?? null;
     const outputText = recipe.produces
       .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
       .join('、');
@@ -1897,4 +1940,3 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
-

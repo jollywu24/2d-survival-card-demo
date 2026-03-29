@@ -6,7 +6,6 @@ import {
   getItemDefinition,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
-  meetsCondition,
   terrainLabel,
   timeLabel,
   useGameStore,
@@ -40,14 +39,6 @@ const phaseLabel = {
   day: '白昼',
   dusk: '黄昏',
   night: '深夜',
-} as const;
-
-const cardTypeLabel = {
-  action: '行动',
-  resource: '资源',
-  recipe: '配方',
-  event: '事件',
-  skill: '技能',
 } as const;
 
 const itemTypeLabel = {
@@ -116,7 +107,6 @@ function App() {
     player,
     environment,
     progress,
-    hand,
     backpack,
     workbench,
     selectedBackpackSlot,
@@ -138,8 +128,8 @@ function App() {
     useBackpackItem,
     useWorkbenchItem,
     discardBackpackItem,
+    exploreTerrainDrops,
     craftWorkbenchRecipe,
-    useCard,
   } = useGameStore();
   const [journalOpen, setJournalOpen] = useState(false);
   const [dragSource, setDragSource] = useState<
@@ -426,14 +416,10 @@ function App() {
   };
 
   const handleExploreTerrain = () => {
-    if (!actionOptionsEnabled || hand.length === 0) {
+    if (!actionOptionsEnabled || !!activeEvent || !!ending) {
       return;
     }
-    const randomCard = hand[Math.floor(Math.random() * hand.length)];
-    if (!randomCard) {
-      return;
-    }
-    useCard(randomCard.id);
+    exploreTerrainDrops(activeTerrain);
   };
 
   const renderBackpackCard = (slot: BackpackSlot) => {
@@ -654,15 +640,6 @@ function App() {
               <span className="location-title">{activeTerrainCards.main}</span>
               <span className="location-meta">{terrainLabel[activeTerrain]} · 主地点</span>
             </button>
-            <button
-              type="button"
-              className={`location-card action ${actionOptionsEnabled ? 'active' : ''}`}
-              onClick={handleExploreTerrain}
-              disabled={!actionOptionsEnabled || hand.length === 0 || !!activeEvent || !!ending}
-            >
-              <span className="location-title">{activeTerrainCards.action}</span>
-              <span className="location-meta">点击后随机执行一张行动卡</span>
-            </button>
             {activeTerrainCards.children.map((entry) => (
               <div key={entry} className="location-card child">
                 <span className="location-title">{entry}</span>
@@ -714,13 +691,6 @@ function App() {
               onClick={() => selectWorkbenchCard(null)}
             >
               {workbenchVisualCards.map((card) => renderWorkbenchCard(card))}
-              {workbenchVisualCards.length === 0 && (
-                <div className="workspace-hint">
-                  这里不再有固定格。
-                  <br />
-                  从背包或行动翻出的物品会分开摆在台面上，再拖去组成卡堆。
-                </div>
-              )}
             </div>
 
             <div className="workspace-bottom">
@@ -909,34 +879,22 @@ function App() {
             </div>
           </div>
           <div className="location-action-list">
-            {hand.map((card) => {
-              const actionCost = card.actionCost ?? 1;
-              const disabled =
-                !actionOptionsEnabled ||
-                !meetsCondition(player, environment, card.condition) ||
-                !!activeEvent ||
-                !!ending ||
-                environment.actionsRemaining < actionCost;
-              return (
-                <button
-                  key={`modal-${card.id}`}
-                  type="button"
-                  className={`action-option ${disabled ? 'disabled' : ''}`}
-                  disabled={disabled}
-                  onClick={() => {
-                    useCard(card.id);
-                    setLocationModalOpen(false);
-                  }}
-                >
-                  <span className="action-option-name">{card.name}</span>
-                  <span className="action-option-desc">{card.description}</span>
-                  <span className="action-option-meta">
-                    <span className={`hand-card-tag type-${card.type}`}>{cardTypeLabel[card.type]}</span>
-                    <span className="hand-card-cost">{actionCost > 0 ? `精力 ${actionCost}` : '无消耗'}</span>
-                  </span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              className={`action-option ${!actionOptionsEnabled || !!activeEvent || !!ending ? 'disabled' : ''}`}
+              disabled={!actionOptionsEnabled || !!activeEvent || !!ending}
+              onClick={() => {
+                handleExploreTerrain();
+                setLocationModalOpen(false);
+              }}
+            >
+              <span className="action-option-name">{activeTerrainCards.action}</span>
+              <span className="action-option-desc">随机翻出 3~5 张资源牌到工作台，自动横向分开摆放。</span>
+              <span className="action-option-meta">
+                <span className="hand-card-tag type-action">探索</span>
+                <span className="hand-card-cost">消耗时间与精力</span>
+              </span>
+            </button>
           </div>
           <button type="button" className="location-action-close" onClick={() => setLocationModalOpen(false)}>
             关闭

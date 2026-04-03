@@ -925,6 +925,261 @@ const removeWorkbenchCardsForRecipe = (
   });
 };
 
+const countTotalOwnedItem = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  itemId: string,
+) => {
+  const backpackCount = backpack.reduce((total, slot) => {
+    if (slot.itemId !== itemId || slot.amount <= 0) {
+      return total;
+    }
+    return total + slot.amount;
+  }, 0);
+  const workbenchCount = workbench.filter((card) => card.itemId === itemId).length;
+  return backpackCount + workbenchCount;
+};
+
+const hasOwnedItem = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  itemId: string,
+) => countTotalOwnedItem(backpack, workbench, itemId) > 0;
+
+const mergeItemChanges = (...lists: Array<ItemStackChange[] | undefined>) => {
+  const totals = new Map<string, number>();
+
+  lists.forEach((list) => {
+    (list ?? []).forEach((entry) => {
+      totals.set(entry.itemId, (totals.get(entry.itemId) ?? 0) + entry.amount);
+    });
+  });
+
+  return [...totals.entries()]
+    .filter(([, amount]) => amount > 0)
+    .map(([itemId, amount]) => ({ itemId, amount }));
+};
+
+const mergeEffects = (...effects: Array<CardEffect | undefined>): CardEffect => {
+  const mergedStatChanges: Partial<Record<StatKey, number>> = {};
+  let moveTerrain: EnvironmentState['terrain'] | undefined;
+  let changeWeather: EnvironmentState['weather'] | undefined;
+  let rest = false;
+  let drawCards = 0;
+  let eventChanceBonus = 0;
+
+  effects.forEach((effect) => {
+    if (!effect) {
+      return;
+    }
+
+    Object.entries(effect.statChanges ?? {}).forEach(([key, value]) => {
+      const statKey = key as StatKey;
+      mergedStatChanges[statKey] = (mergedStatChanges[statKey] ?? 0) + (value ?? 0);
+    });
+
+    if (effect.moveTerrain) {
+      moveTerrain = effect.moveTerrain;
+    }
+    if (effect.changeWeather) {
+      changeWeather = effect.changeWeather;
+    }
+    rest = rest || !!effect.rest;
+    drawCards += effect.drawCards ?? 0;
+    eventChanceBonus += effect.eventChanceBonus ?? 0;
+  });
+
+  return {
+    statChanges: Object.keys(mergedStatChanges).length > 0 ? mergedStatChanges : undefined,
+    moveTerrain,
+    changeWeather,
+    rest: rest || undefined,
+    drawCards: drawCards || undefined,
+    eventChanceBonus: eventChanceBonus || undefined,
+    gainItems: mergeItemChanges(...effects.map((effect) => effect?.gainItems)),
+    gainWorkbenchItems: mergeItemChanges(...effects.map((effect) => effect?.gainWorkbenchItems)),
+  };
+};
+
+const getPassiveTransitionOutcome = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  player: PlayerState,
+  nextEnvironment: EnvironmentState,
+  nextPhase: EnvironmentState['timeOfDay'],
+  startOfNewDay: boolean,
+) => {
+  let nextPlayer = player;
+  let nextBackpack = backpack;
+  const logs: string[] = [];
+
+  const hasCampfire = hasOwnedItem(backpack, workbench, 'campfire');
+  const hasShelter = hasOwnedItem(backpack, workbench, 'temporary-shelter');
+  const hasCollector = hasOwnedItem(backpack, workbench, 'water-collector');
+  const hasTrap = hasOwnedItem(backpack, workbench, 'simple-trap');
+  const hasWrap = hasOwnedItem(backpack, workbench, 'waterproof-wrap');
+  const hasContainer = hasOwnedItem(backpack, workbench, 'clean-container');
+  const hasTotem = hasOwnedItem(backpack, workbench, 'spirit-totem');
+
+  if (hasCampfire && (nextPhase === 'dusk' || nextPhase === 'night')) {
+    nextPlayer = applyStatChanges(nextPlayer, { temperature: 8, sanity: 4 });
+    logs.push('篝火撑住了营地的温度。');
+  }
+
+  if (hasShelter && (nextPhase === 'night' || nextEnvironment.weather !== 'sunny')) {
+    nextPlayer = applyStatChanges(nextPlayer, { temperature: 6, health: 2, sanity: 1 });
+    logs.push('临时庇护所替你挡掉了部分风雨。');
+  }
+
+  if (hasWrap && (nextEnvironment.weather === 'rain' || nextEnvironment.weather === 'storm')) {
+    nextPlayer = applyStatChanges(nextPlayer, { sanity: 3 });
+    logs.push('防水包裹保住了关键物资。');
+  }
+
+  if (hasTotem && nextPhase === 'night') {
+    nextPlayer = applyStatChanges(nextPlayer, { sanity: 6 });
+    logs.push('精神支柱让你在夜里没有完全散掉。');
+  }
+
+  if (hasCollector && (nextEnvironment.weather === 'rain' || nextEnvironment.weather === 'storm')) {
+    const waterYield = hasContainer ? 2 : 1;
+    const collected = addItemsToBackpack(nextBackpack, [{ itemId: 'fresh-water', amount: waterYield }]);
+    nextBackpack = collected.backpack;
+    logs.push(
+      collected.overflow.length > 0
+        ? '集水装置接到了淡水，但背包太满没能全部收下。'
+        : `集水装置接到了 ${waterYield} 份淡水。`,
+    );
+  }
+
+  if (hasTrap && startOfNewDay) {
+    const trapRoll = Math.random();
+    if (trapRoll < 0.65) {
+      const trappedItemId = trapRoll < 0.25 ? 'raw-fish' : trapRoll < 0.5 ? 'berries' : 'beast-hide';
+      const trapped = addItemsToBackpack(nextBackpack, [{ itemId: trappedItemId, amount: 1 }]);
+      nextBackpack = trapped.backpack;
+      const trappedItemName = itemById.get(trappedItemId)?.name ?? trappedItemId;
+      logs.push(
+        trapped.overflow.length > 0
+          ? `简易陷阱抓到了 ${trappedItemName}，但背包没地方放。`
+          : `简易陷阱替你留下一份 ${trappedItemName}。`,
+      );
+    }
+  }
+
+  return { player: nextPlayer, backpack: nextBackpack, logs };
+};
+
+const getExploreBonusDrops = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  terrain: EnvironmentState['terrain'],
+) => {
+  const bonuses: string[] = [];
+  const hasKnife =
+    hasOwnedItem(backpack, workbench, 'stone-knife') ||
+    hasOwnedItem(backpack, workbench, 'flint-knife');
+  const hasSpear = hasOwnedItem(backpack, workbench, 'spear');
+  const hasContainer = hasOwnedItem(backpack, workbench, 'clean-container');
+
+  if (hasKnife) {
+    bonuses.push(terrain === 'beach' ? 'pebble' : terrain === 'jungle' ? 'vine' : 'flint');
+  }
+
+  if (hasSpear) {
+    if (terrain === 'beach') {
+      bonuses.push('raw-fish');
+    }
+    if (terrain === 'jungle') {
+      bonuses.push('beast-hide');
+    }
+  }
+
+  if (hasContainer && terrain === 'cave') {
+    bonuses.push('fresh-water');
+  }
+
+  return bonuses;
+};
+
+const getEventContextEffect = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  progress: PrototypeProgress,
+  event: EventDefinition,
+) => {
+  const effects: CardEffect[] = [];
+  const notes: string[] = [];
+  const hasCampfire = hasOwnedItem(backpack, workbench, 'campfire');
+  const hasCampfireKit = hasOwnedItem(backpack, workbench, 'campfire-kit');
+  const hasShelter = hasOwnedItem(backpack, workbench, 'temporary-shelter');
+  const hasWrap = hasOwnedItem(backpack, workbench, 'waterproof-wrap');
+  const hasSpear = hasOwnedItem(backpack, workbench, 'spear');
+  const hasTrap = hasOwnedItem(backpack, workbench, 'simple-trap');
+  const hasContainer = hasOwnedItem(backpack, workbench, 'clean-container');
+  const hasCollector = hasOwnedItem(backpack, workbench, 'water-collector');
+  const hasKnife =
+    hasOwnedItem(backpack, workbench, 'stone-knife') ||
+    hasOwnedItem(backpack, workbench, 'flint-knife');
+
+  if (event.id === 'first-night' && (hasCampfire || hasCampfireKit)) {
+    effects.push({ statChanges: { temperature: 6, sanity: 4 } });
+    notes.push('你提前准备的火源让第一夜没那么冷。');
+  }
+
+  if (event.id === 'storm-impact') {
+    if (hasShelter) {
+      effects.push({ statChanges: { temperature: 10, health: 4, sanity: 3 } });
+      notes.push('庇护所扛住了最糟的一阵风。');
+    }
+    if (hasWrap) {
+      effects.push({ statChanges: { sanity: 2 } });
+      notes.push('防水包裹保住了关键物资。');
+    }
+  }
+
+  if (event.id === 'forest-signs' && hasKnife) {
+    effects.push({ gainItems: [{ itemId: 'herb', amount: 1 }] });
+    notes.push('切割工具让你多带回了一点草药。');
+  }
+
+  if (event.id === 'boar-raid') {
+    if (hasSpear) {
+      effects.push({
+        statChanges: { sanity: 5, health: 4 },
+        gainItems: [{ itemId: 'beast-hide', amount: 1 }],
+      });
+      notes.push('木矛替你挡住了扑来的那一下，还留下了一块兽皮。');
+    } else if (hasTrap) {
+      effects.push({ statChanges: { sanity: 3 } });
+      notes.push('营地边的陷阱拖慢了它冲进来的节奏。');
+    }
+  }
+
+  if (event.id === 'dirty-water') {
+    if (hasContainer) {
+      effects.push({
+        statChanges: { health: 4, thirst: 4 },
+        gainItems: [{ itemId: 'fresh-water', amount: 1 }],
+      });
+      notes.push('净水容器把最坏的情况挡住了。');
+    }
+    if (hasCollector) {
+      effects.push({ statChanges: { sanity: 2 } });
+      notes.push('集水装置让你知道自己还没完全断水。');
+    }
+  }
+
+  if (event.id === 'rescue-window' && progress.beaconCrafted) {
+    effects.push({ statChanges: { sanity: 12, health: 6 } });
+    notes.push('求救信标把火光抬得足够高，海面那头显然看见了。');
+  }
+
+  return {
+    effect: mergeEffects(...effects),
+    notes,
+  };
+};
 const createInitialState = () => {
   const seeded = addItemsToBackpack(createInitialBackpack(), [
     { itemId: 'berries', amount: 1 },
@@ -1072,21 +1327,42 @@ const createEnding = (
 };
 
 const getScriptedEventIdForPhase = (day: number, phase: EnvironmentState['timeOfDay']) => {
+  if (day === 1 && phase === 'night') {
+    return 'first-night';
+  }
+  if (day === 2 && phase === 'dusk') {
+    return 'tide-cache';
+  }
   if (day === 3 && phase === 'night') {
     return 'storm-impact';
+  }
+  if (day === 4 && phase === 'dusk') {
+    return 'forest-signs';
   }
   if (day === 5 && phase === 'night') {
     return 'boar-raid';
   }
-  if (day === 6 && (phase === 'day' || phase === 'dusk')) {
+  if (day === 6 && phase === 'day') {
     return 'dirty-water';
+  }
+  if (day === 7 && phase === 'dusk') {
+    return 'rescue-window';
   }
   return null;
 };
 
 const getPhaseForeshadow = (day: number, phase: EnvironmentState['timeOfDay']) => {
+  if (day === 1 && phase === 'dusk') {
+    return '太阳下去得很快，今晚会是你真正意义上的第一夜。';
+  }
+  if (day === 2 && phase === 'day') {
+    return '退潮后海滩上露出了新的漂流痕迹，也许能翻出点真正有用的东西。';
+  }
   if (day === 3 && phase === 'dusk') {
     return '天边的云层压得很低，今晚恐怕不是普通的雨夜。';
+  }
+  if (day === 4 && phase === 'day') {
+    return '内陆边缘出现了新折断的枝叶，里面像是有资源，也像是有风险。';
   }
   if (day === 5 && phase === 'dusk') {
     return '营地附近出现了翻动泥土的痕迹，像是有大型动物在徘徊。';
@@ -1094,9 +1370,11 @@ const getPhaseForeshadow = (day: number, phase: EnvironmentState['timeOfDay']) =
   if (day === 6 && phase === 'day') {
     return '你发现存下来的淡水味道不太对，也许水源正在变坏。';
   }
+  if (day === 7 && phase === 'day') {
+    return '海平面今天格外清晰，如果要被看见，机会多半就在今天。';
+  }
   return null;
 };
-
 const getNextPhase = (current: EnvironmentState['timeOfDay']) => {
   const index = PHASE_ORDER.indexOf(current);
   return PHASE_ORDER[(index + 1) % PHASE_ORDER.length];
@@ -1292,9 +1570,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const applied = applyEffect(state.player, state.environment, option.effect);
-    const inventoryResult = addItemsToBackpack(state.backpack, option.effect.gainItems);
-    const nextHand = rotateDeck(state.deck, state.hand, option.effect.drawCards ?? 0);
+    const contextBonus = getEventContextEffect(state.backpack, state.workbench, state.progress, event);
+    const finalEffect = mergeEffects(option.effect, contextBonus.effect);
+    const applied = applyEffect(state.player, state.environment, finalEffect);
+    const inventoryResult = addItemsToBackpack(state.backpack, finalEffect.gainItems);
+    const nextHand = rotateDeck(state.deck, state.hand, finalEffect.drawCards ?? 0);
+    const overflowText =
+      inventoryResult.overflow.length > 0 ? ` 背包太满，没能收下：${inventoryResult.overflow.join('、')}。` : '';
+    const bonusText = contextBonus.notes.length > 0 ? ` ${contextBonus.notes.join('')}` : '';
 
     set((current) => ({
       player: applied.player,
@@ -1302,18 +1585,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       progress: {
         ...current.progress,
         lastActionSummary: `我最终选择了“${option.label}”来应对${event.title}。`,
-        resolvedCrises: [event.title, ...current.progress.resolvedCrises].slice(0, 3),
+        resolvedCrises: [event.title, ...current.progress.resolvedCrises].slice(0, 6),
       },
       backpack: inventoryResult.backpack,
       hand: nextHand,
       activeEvent: null,
       logs: [
-        createLog(`【${event.title}】${option.resultText}`),
+        createLog(`【${event.title}】${option.resultText}${bonusText}${overflowText}`),
         ...current.logs,
       ].slice(0, 10),
     }));
   },
-
   setTerrain: (terrain) => {
     const state = get();
     if (state.ending || state.activeEvent) {
@@ -1713,7 +1995,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       }));
       return;
     }
-    const drops = pickRandomTerrainDrops(terrain);
+    const bonusDrops = getExploreBonusDrops(state.backpack, state.workbench, terrain);
+    const drops = [...pickRandomTerrainDrops(terrain), ...bonusDrops];
     const dropEntries = drops.map((itemId) => ({ itemId, amount: 1 }));
     const baseX = 120 + Math.floor(Math.random() * 60);
     const baseY = 70 + Math.floor(Math.random() * 40);
@@ -1722,18 +2005,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       dropEntries,
       { x: baseX, y: baseY },
     );
+    const bonusText =
+      bonusDrops.length > 0
+        ? ` 工具额外带回：${bonusDrops.map((id) => itemById.get(id)?.name ?? id).join('、')}。`
+        : '';
     set((current) => ({
       environment: spendActions(current.environment, timeCost),
       player: applyEffortDrain(current.player, actionCost),
       workbench: nextWorkbench,
       selectedWorkbenchCardId: nextWorkbench[nextWorkbench.length - 1]?.id ?? null,
       logs: [
-        createLog(`你探索了${terrainLabel[terrain]}，发现：${drops.map((id) => itemById.get(id)?.name ?? id).join('、')}。`),
+        createLog(`你探索了${terrainLabel[terrain]}，发现：${drops.map((id) => itemById.get(id)?.name ?? id).join('、')}。${bonusText}`),
         ...current.logs,
       ].slice(0, 10),
     }));
   },
-
   craftRecipe: (recipeId) => {
     const state = get();
     if (state.ending) {
@@ -1921,10 +2207,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       actionLimit: PHASE_ACTION_LIMIT[nextPhase],
     };
 
-    const nextPlayer = applyStatChanges(
+    const playerAfterDecay = applyStatChanges(
       state.player,
       getPhaseStatDecay(nextPhase, nextEnvironment.weather),
     );
+    const passiveOutcome = getPassiveTransitionOutcome(
+      state.backpack,
+      state.workbench,
+      playerAfterDecay,
+      nextEnvironment,
+      nextPhase,
+      startOfNewDay,
+    );
+    const nextPlayer = passiveOutcome.player;
 
     const progressAfterTurn: PrototypeProgress = {
       ...state.progress,
@@ -1968,17 +2263,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       ? [createLog(`危机爆发：${scriptedEvent.title}`)]
       : [];
     const foreshadowLogs = foreshadowText ? [createLog(`征兆：${foreshadowText}`)] : [];
+    const passiveLogs = passiveOutcome.logs.map((text) => createLog(text));
 
     set((current) => ({
       player: nextPlayer,
       environment: nextEnvironment,
       progress: progressAfterTurn,
+      backpack: passiveOutcome.backpack,
       activeEvent: ending ? null : scriptedEvent,
       ending,
       logs: [
         createLog(
           `进入第 ${nextEnvironment.day} 天 ${timeLabel[nextEnvironment.timeOfDay]}，天气：${weatherLabel[nextEnvironment.weather]}，当前时段可用 ${nextEnvironment.actionLimit} 分钟。`,
         ),
+        ...passiveLogs,
         ...foreshadowLogs,
         ...scriptedEventLogs,
         ...goalLog,
@@ -1987,7 +2285,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       ].slice(0, 10),
     }));
   },
-
   resetGame: () => {
     set(createInitialState());
   },
@@ -2034,6 +2331,9 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
+
+
+
 
 
 

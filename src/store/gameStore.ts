@@ -422,6 +422,17 @@ const getWorkbenchCard = (workbench: WorkbenchCard[], cardId: string) =>
 const getWorkbenchStackCards = (workbench: WorkbenchCard[], stackId: string) =>
   workbench.filter((card) => card.stackId === stackId);
 
+
+const getWorkbenchCardGroupCards = (workbench: WorkbenchCard[], cardId: string) => {
+  const sourceCard = getWorkbenchCard(workbench, cardId);
+  if (!sourceCard) {
+    return [] as WorkbenchCard[];
+  }
+
+  return workbench.filter(
+    (card) => card.stackId === sourceCard.stackId && card.itemId === sourceCard.itemId,
+  );
+};
 const addItemsToWorkbench = (
   workbench: WorkbenchCard[],
   gains: ItemStackChange[] = [],
@@ -472,25 +483,53 @@ const setWorkbenchStackPosition = (
   );
 };
 
-const mergeWorkbenchStacks = (
+const moveWorkbenchCardGroup = (
   workbench: WorkbenchCard[],
-  sourceStackId: string,
-  targetStackId: string,
+  workbenchCardId: string,
+  position?: { x: number; y: number },
+  targetCardId?: string,
 ) => {
-  const nextWorkbench = cloneWorkbench(workbench);
-  const targetCard = nextWorkbench.find((card) => card.stackId === targetStackId);
-
-  if (!targetCard || sourceStackId === targetStackId) {
-    return nextWorkbench;
+  const sourceCard = getWorkbenchCard(workbench, workbenchCardId);
+  if (!sourceCard) {
+    return cloneWorkbench(workbench);
   }
 
+  const sourceGroupCards = getWorkbenchCardGroupCards(workbench, workbenchCardId);
+  const sourceStackCards = getWorkbenchStackCards(workbench, sourceCard.stackId);
+  const movingWholeStack = sourceGroupCards.length === sourceStackCards.length;
+  const targetCard =
+    targetCardId && targetCardId !== workbenchCardId ? getWorkbenchCard(workbench, targetCardId) : null;
+  const nextWorkbench = cloneWorkbench(workbench);
+
+  if (targetCard) {
+    if (targetCard.stackId === sourceCard.stackId) {
+      return nextWorkbench;
+    }
+
+    return nextWorkbench.map((card) =>
+      sourceGroupCards.some((groupCard) => groupCard.id === card.id)
+        ? {
+            ...card,
+            stackId: targetCard.stackId,
+            x: targetCard.x,
+            y: targetCard.y,
+          }
+        : card,
+    );
+  }
+
+  const nextPosition = clampWorkbenchPosition(position);
+  const nextStackId = movingWholeStack
+    ? sourceCard.stackId
+    : `${sourceCard.id}-split-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+
   return nextWorkbench.map((card) =>
-    card.stackId === sourceStackId
+    sourceGroupCards.some((groupCard) => groupCard.id === card.id)
       ? {
           ...card,
-          stackId: targetStackId,
-          x: targetCard.x,
-          y: targetCard.y,
+          stackId: nextStackId,
+          x: nextPosition.x,
+          y: nextPosition.y,
         }
       : card,
   );
@@ -1438,20 +1477,34 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
+    const sourceGroupCards = getWorkbenchCardGroupCards(state.workbench, workbenchCardId);
+    const sourceStackCards = getWorkbenchStackCards(state.workbench, sourceCard.stackId);
+    const movingWholeStack = sourceGroupCards.length === sourceStackCards.length;
     const targetCard =
       targetCardId && targetCardId !== workbenchCardId
         ? getWorkbenchCard(state.workbench, targetCardId)
         : null;
 
-    const nextWorkbench = targetCard
-      ? mergeWorkbenchStacks(state.workbench, sourceCard.stackId, targetCard.stackId)
-      : setWorkbenchStackPosition(state.workbench, sourceCard.stackId, position);
+    const nextWorkbench = moveWorkbenchCardGroup(
+      state.workbench,
+      workbenchCardId,
+      position,
+      targetCardId,
+    );
 
     set((current) => ({
       workbench: nextWorkbench,
       selectedWorkbenchCardId: targetCard?.id ?? workbenchCardId,
       logs: [
-        createLog(targetCard ? '你把两叠卡拖到了一起。' : '你挪动了工作台上的卡堆。'),
+        createLog(
+          targetCard
+            ? movingWholeStack
+              ? '你把整叠卡拖到了另一叠上。'
+              : '你把这组卡从原堆里拖出来，叠到了另一叠上。'
+            : movingWholeStack
+              ? '你挪动了整叠卡的位置。'
+              : '你把这组卡从原堆里拖了出来。',
+        ),
         ...current.logs,
       ].slice(0, 10),
     }));
@@ -1983,4 +2036,5 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
+
 

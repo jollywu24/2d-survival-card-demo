@@ -172,6 +172,53 @@ function App() {
   const completedGoalCount = allPrototypeGoals.filter((goal) =>
     isPrototypeGoalComplete(goal, player, progress),
   ).length;
+  const rescueRouteText = useMemo(() => {
+    if (progress.beaconCrafted) {
+      return '信号篝火已经就位，现在最重要的是把身体和营地撑到第七天的救援窗口。';
+    }
+
+    if (environment.day >= 7) {
+      return '最后窗口已经到了。如果现在还没有信号篝火，就只能尽量活着撑到结算。';
+    }
+
+    if (environment.day === 6) {
+      return '最后准备日：优先凑齐篝火、木矛和兽皮，在今天结束前完成信号篝火。';
+    }
+
+    if (environment.day >= 4) {
+      return '主线已经进入备料阶段，开始围绕“篝火 + 木矛 + 兽皮”这条信标链做准备。';
+    }
+
+    return '主线目标：先稳住吃喝和体温，再做出篝火、庇护所与木矛，为第六天的信号篝火铺路。';
+  }, [environment.day, progress.beaconCrafted]);
+  const dangerAlerts = useMemo(() => {
+    const alerts: string[] = [];
+
+    if (activeEvent) {
+      alerts.push('当前危机还没处理，其他操作都会被打断。');
+    }
+
+    if (player.thirst <= 35) {
+      alerts.push('水分已经偏低，优先找水、接雨或处理椰子。');
+    }
+    if (player.hunger <= 35) {
+      alerts.push('饱腹正在见底，别把高价值食物拖到晚上才处理。');
+    }
+    if (player.temperature <= 40) {
+      alerts.push('体温在危险边缘，黄昏前最好准备火源或庇护所。');
+    }
+    if (player.sanity <= 35) {
+      alerts.push('精神压力已经明显上来了，夜里最好留出恢复手段。');
+    }
+    if (player.fatigue <= 30) {
+      alerts.push('精力很差，继续硬做重行动会让后面几段一起崩。');
+    }
+    if (!progress.beaconCrafted && environment.day >= 5) {
+      alerts.push(`距离救援窗口只剩 ${Math.max(0, 7 - environment.day)} 天，信号篝火该进入最高优先级了。`);
+    }
+
+    return alerts.slice(0, 3);
+  }, [activeEvent, environment.day, player.fatigue, player.hunger, player.sanity, player.temperature, player.thirst, progress.beaconCrafted]);
   const timeSnapshot = useMemo(() => {
     const range = phaseMinuteRange[environment.timeOfDay];
     const elapsed = Math.max(0, range.length - environment.actionsRemaining);
@@ -553,7 +600,7 @@ function App() {
           </div>
           <div className="game-title">
             漂流者
-            <span>storm journal prototype</span>
+            <span>seven-day survival mvp</span>
           </div>
           <div className="top-right">
             <div className="weather-box">
@@ -632,6 +679,17 @@ function App() {
             <span className="goal-progress">
               完成度 {completedGoalCount} / {allPrototypeGoals.length}
             </span>
+            <div className="route-note">
+              <span className="route-label">主线目标</span>
+              <p>{rescueRouteText}</p>
+            </div>
+            {dangerAlerts.length > 0 && (
+              <div className="danger-list">
+                {dangerAlerts.map((alert) => (
+                  <div key={alert} className="danger-chip">{alert}</div>
+                ))}
+              </div>
+            )}
           </div>
         </aside>
 
@@ -800,7 +858,7 @@ function App() {
           selectedBackpackSlotData={selectedBackpackSlotData}
           selectedBackpackTotalWeight={selectedBackpackTotalWeight}
           activeEvent={!!activeEvent}
-          ending={!!ending}
+          ending={ending}
           onUseBackpackItem={useBackpackItem}
           onDiscardBackpackItem={discardBackpackItem}
           logs={logs}
@@ -827,7 +885,7 @@ function App() {
               }}
             >
               <span className="action-option-name">{activeTerrainCards.action}</span>
-              <span className="action-option-desc">随机翻出 3~5 张资源牌到工作台，自动横向分开摆放。</span>
+              <span className="action-option-desc">海滩翻出 3~4 张，丛林或洞穴翻出 2~3 张资源牌到工作台。</span>
               <span className="action-option-meta">
                 <span className="time-badge">⏳ {activeTerrain === 'cave' ? 90 : 60} 分钟</span>
                 <span className="hand-card-tag type-action">探索</span>

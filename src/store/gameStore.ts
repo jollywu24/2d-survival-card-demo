@@ -71,9 +71,9 @@ const BACKPACK_MAX_WEIGHT = 18;
 const TOTAL_DAYS = 7;
 const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
 const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
-  day: 12 * 60,
-  dusk: 4 * 60,
-  night: 8 * 60,
+  day: 8 * 30,
+  dusk: 4 * 30,
+  night: 3 * 30,
 };
 const TIME_PER_ACTION_POINT = 30;
 const scriptedEventById = new Map(scriptedEvents.map((event) => [event.id, event]));
@@ -764,7 +764,7 @@ const prototypeGoals: PrototypeGoal[] = [
     id: 'prepare-fire',
     day: 2,
     title: '准备火源',
-    description: '合成或收集火种包，为夜晚和恶劣天气做准备。',
+    description: '尽快搭起稳定火源，别在第三夜之前还靠硬熬。',
   },
   {
     id: 'build-shelter',
@@ -788,7 +788,7 @@ const prototypeGoals: PrototypeGoal[] = [
     id: 'signal-ready',
     day: 6,
     title: '搭建求救信号',
-    description: '在工作台合成求救信标，为第七天做最后准备。',
+    description: '第六天结束前完成信号篝火，否则第七天也很难被看见。',
   },
   {
     id: 'survive-until-rescue',
@@ -1022,22 +1022,22 @@ const getPassiveTransitionOutcome = (
   const hasTotem = hasOwnedItem(backpack, workbench, 'spirit-totem');
 
   if (hasCampfire && (nextPhase === 'dusk' || nextPhase === 'night')) {
-    nextPlayer = applyStatChanges(nextPlayer, { temperature: 8, sanity: 4 });
+    nextPlayer = applyStatChanges(nextPlayer, { temperature: 6, sanity: 3 });
     logs.push('篝火撑住了营地的温度。');
   }
 
   if (hasShelter && (nextPhase === 'night' || nextEnvironment.weather !== 'sunny')) {
-    nextPlayer = applyStatChanges(nextPlayer, { temperature: 6, health: 2, sanity: 1 });
+    nextPlayer = applyStatChanges(nextPlayer, { temperature: 5, health: 2, sanity: 1 });
     logs.push('临时庇护所替你挡掉了部分风雨。');
   }
 
   if (hasWrap && (nextEnvironment.weather === 'rain' || nextEnvironment.weather === 'storm')) {
-    nextPlayer = applyStatChanges(nextPlayer, { sanity: 3 });
+    nextPlayer = applyStatChanges(nextPlayer, { sanity: 2 });
     logs.push('防水包裹保住了关键物资。');
   }
 
   if (hasTotem && nextPhase === 'night') {
-    nextPlayer = applyStatChanges(nextPlayer, { sanity: 6 });
+    nextPlayer = applyStatChanges(nextPlayer, { sanity: 5 });
     logs.push('精神支柱让你在夜里没有完全散掉。');
   }
 
@@ -1054,8 +1054,8 @@ const getPassiveTransitionOutcome = (
 
   if (hasTrap && startOfNewDay) {
     const trapRoll = Math.random();
-    if (trapRoll < 0.65) {
-      const trappedItemId = trapRoll < 0.25 ? 'raw-fish' : trapRoll < 0.5 ? 'berries' : 'beast-hide';
+    if (trapRoll < 0.5) {
+      const trappedItemId = trapRoll < 0.18 ? 'raw-fish' : trapRoll < 0.38 ? 'berries' : 'beast-hide';
       const trapped = addItemsToBackpack(nextBackpack, [{ itemId: trappedItemId, amount: 1 }]);
       nextBackpack = trapped.backpack;
       const trappedItemName = itemById.get(trappedItemId)?.name ?? trappedItemId;
@@ -1392,8 +1392,8 @@ const getPhaseStatDecay = (
 
   if (phase === 'day') {
     return {
-      hunger: -5,
-      thirst: -6,
+      hunger: -6,
+      thirst: -8,
       fatigue: -3,
       temperature: weatherTemperaturePenalty,
     };
@@ -1401,8 +1401,8 @@ const getPhaseStatDecay = (
 
   if (phase === 'dusk') {
     return {
-      hunger: -3,
-      thirst: -4,
+      hunger: -4,
+      thirst: -5,
       fatigue: -4,
       temperature: weatherTemperaturePenalty - 2,
       sanity: -2,
@@ -1410,10 +1410,10 @@ const getPhaseStatDecay = (
   }
 
   return {
-    hunger: -4,
-    thirst: -5,
-    fatigue: -6,
-    temperature: weatherTemperaturePenalty - 4,
+    hunger: -5,
+    thirst: -6,
+    fatigue: -7,
+    temperature: weatherTemperaturePenalty - 5,
     sanity: -4,
   };
 };
@@ -1427,27 +1427,27 @@ const spendActions = (environment: EnvironmentState, cost: number): EnvironmentS
   actionsRemaining: Math.max(0, environment.actionsRemaining - cost),
 });
 
-const applyEffortDrain = (player: PlayerState, timeCost: number) =>
+const applyEffortDrain = (player: PlayerState, effortCost: number) =>
   applyStatChanges(player, {
-    fatigue: -(timeCost * 7),
-    thirst: -(timeCost * 2),
-    hunger: -(timeCost * 1),
+    fatigue: -(effortCost * 8),
+    thirst: -(effortCost * 2),
+    hunger: -(effortCost * 2),
   });
 
 const applySleepRecovery = (player: PlayerState) =>
   applyStatChanges(player, {
-    fatigue: 34,
-    sanity: 10,
-    health: 4,
+    fatigue: 30,
+    sanity: 8,
+    health: 3,
   });
 const terrainDropPool: Record<EnvironmentState['terrain'], string[]> = {
-  beach: ['green-coconut', 'driftwood', 'pebble', 'palm-leaf', 'fresh-water'],
+  beach: ['green-coconut', 'driftwood', 'pebble', 'palm-leaf'],
   jungle: ['driftwood', 'vine', 'herb', 'bamboo', 'berries'],
-  cave: ['flint', 'stone', 'herb', 'fresh-water', 'pebble'],
+  cave: ['flint', 'stone', 'herb', 'pebble'],
 };
 const pickRandomTerrainDrops = (terrain: EnvironmentState['terrain']) => {
   const pool = terrainDropPool[terrain];
-  const count = 3 + Math.floor(Math.random() * 3);
+  const count = terrain === 'beach' ? 3 + Math.floor(Math.random() * 2) : 2 + Math.floor(Math.random() * 2);
   return Array.from({ length: count }, () => pool[Math.floor(Math.random() * pool.length)]);
 };
 
@@ -2331,6 +2331,8 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
+
+
 
 
 

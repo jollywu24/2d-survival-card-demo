@@ -1,4 +1,4 @@
-import type { LogEntry, ItemDefinition, BackpackSlot } from '../types/game';
+﻿import type { BackpackSlot, GameEnding, ItemDefinition, LogEntry } from '../types/game';
 
 interface InfoSidebarProps {
   backpackWeight: number;
@@ -7,7 +7,7 @@ interface InfoSidebarProps {
   selectedBackpackSlotData: BackpackSlot | null;
   selectedBackpackTotalWeight: number;
   activeEvent: boolean;
-  ending: boolean;
+  ending: GameEnding | null;
   onUseBackpackItem: (slotIndex: number) => void;
   onDiscardBackpackItem: (slotIndex: number) => void;
   logs: LogEntry[];
@@ -27,8 +27,21 @@ export function InfoSidebar({
   logs,
   day,
 }: InfoSidebarProps) {
+  const slotFillPercent =
+    selectedBackpackItem && selectedBackpackSlotData
+      ? Math.round((selectedBackpackSlotData.amount / selectedBackpackItem.maxStack) * 100)
+      : 0;
+
   return (
     <aside className="panel-info">
+      {ending && (
+        <div className="info-section ending-section">
+          <div className="info-head">本局结算</div>
+          <div className="ending-title">{ending.title}</div>
+          <p className="ending-copy">{ending.description}</p>
+        </div>
+      )}
+
       <div className="info-section">
         <div className="info-head">背包负重</div>
         <div className="carry-line">
@@ -51,14 +64,14 @@ export function InfoSidebar({
             <p>{selectedBackpackItem.description}</p>
             <div className="focus-icon">{selectedBackpackItem.icon}</div>
             <div className="focus-meta">
-              <span>✶ {Math.round((selectedBackpackSlotData.amount / selectedBackpackItem.maxStack) * 100)}%</span>
-              <span>⚖ {selectedBackpackTotalWeight.toFixed(2)} 公斤</span>
+              <span>堆叠 {slotFillPercent}%</span>
+              <span>重量 {selectedBackpackTotalWeight.toFixed(2)} kg</span>
             </div>
             <div className="paper-actions">
               <button
                 type="button"
                 className="btn-paper"
-                disabled={activeEvent || ending || !selectedBackpackItem.effect}
+                disabled={activeEvent || !!ending || !selectedBackpackItem.effect}
                 onClick={() => onUseBackpackItem(selectedBackpackSlotData.slotIndex)}
               >
                 使用
@@ -66,6 +79,7 @@ export function InfoSidebar({
               <button
                 type="button"
                 className="btn-paper secondary-ink"
+                disabled={!!ending}
                 onClick={() => onDiscardBackpackItem(selectedBackpackSlotData.slotIndex)}
               >
                 丢弃
@@ -73,7 +87,7 @@ export function InfoSidebar({
             </div>
           </div>
         ) : (
-          <div className="info-empty">先在背包中选择一张卡。</div>
+          <div className="info-empty">先在背包里选中一张物品卡，再决定使用或丢弃。</div>
         )}
       </div>
 

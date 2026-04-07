@@ -2422,3 +2422,56 @@ body {
   font-size: 12px;
   color: rgba(180, 160, 110, 0.58);
 }
+
+.route-note {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(61, 46, 24, 0.18);
+}
+
+.route-label {
+  margin-top: 0;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.left-note .route-note p {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.danger-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.danger-chip {
+  padding: 7px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(139, 46, 30, 0.22);
+  background: rgba(139, 46, 30, 0.08);
+  color: rgba(73, 24, 16, 0.92);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ending-section {
+  border: 1px solid rgba(196, 102, 26, 0.28);
+  background: linear-gradient(180deg, rgba(122, 92, 46, 0.18), rgba(0, 0, 0, 0.14));
+}
+
+.ending-title {
+  margin-top: 6px;
+  font-size: 18px;
+  color: #f2d18a;
+}
+
+.ending-copy {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(230, 214, 184, 0.78);
+}

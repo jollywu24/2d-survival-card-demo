@@ -29,7 +29,7 @@ export const starterDeck: CardDefinition[] = [
     effect: {
       statChanges: { hunger: 8, fatigue: -6, sanity: 2 },
       gainItems: [
-        { itemId: 'berries', amount: 2 },
+        { itemId: 'berries', amount: 1 },
         { itemId: 'palm-leaf', amount: 1 },
       ],
     },
@@ -63,7 +63,6 @@ export const starterDeck: CardDefinition[] = [
       statChanges: { fatigue: -10 },
       gainItems: [
         { itemId: 'raw-fish', amount: 1 },
-        { itemId: 'driftwood', amount: 1 },
       ],
     },
     condition: {
@@ -109,15 +108,14 @@ export const starterDeck: CardDefinition[] = [
     actionCost: 2,
     description: '进入丛林寻找资源，有机会发现草药与新机会。',
     effect: {
-      statChanges: { fatigue: -10, thirst: -6 },
+      statChanges: { fatigue: -12, thirst: -8 },
       moveTerrain: 'jungle',
       drawCards: 1,
       eventChanceBonus: 0.15,
       gainItems: [
-        { itemId: 'herb', amount: 2 },
+        { itemId: 'herb', amount: 1 },
         { itemId: 'vine', amount: 1 },
         { itemId: 'bamboo', amount: 1 },
-        { itemId: 'beast-hide', amount: 1 },
       ],
     },
     condition: {
@@ -132,11 +130,11 @@ export const starterDeck: CardDefinition[] = [
     actionCost: 1,
     description: '洞穴更安全，但也会带来未知风险。',
     effect: {
-      statChanges: { sanity: -4, temperature: 10 },
+      statChanges: { sanity: -6, temperature: 8, fatigue: -4 },
       moveTerrain: 'cave',
       eventChanceBonus: 0.1,
       gainItems: [
-        { itemId: 'flint', amount: 2 },
+        { itemId: 'flint', amount: 1 },
         { itemId: 'stone', amount: 1 },
       ],
     },
@@ -203,3 +201,4 @@ export const starterDeck: CardDefinition[] = [
     },
   },
 ];
+

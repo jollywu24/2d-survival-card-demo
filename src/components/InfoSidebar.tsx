@@ -39,6 +39,19 @@ export function InfoSidebar({
           <div className="info-head">本局结算</div>
           <div className="ending-title">{ending.title}</div>
           <p className="ending-copy">{ending.description}</p>
+          <div className="survivor-type-card">
+            <div className="survivor-type-code">{ending.survivorType.code}</div>
+            <div>
+              <div className="survivor-type-label">{ending.survivorType.label}</div>
+              <div className="survivor-type-tagline">{ending.survivorType.tagline}</div>
+            </div>
+          </div>
+          <div className="survivor-traits">
+            {ending.survivorType.traits.map((trait) => (
+              <span key={trait} className="survivor-trait-chip">{trait}</span>
+            ))}
+          </div>
+          <p className="survivor-type-summary">{ending.survivorType.summary}</p>
         </div>
       )}
 

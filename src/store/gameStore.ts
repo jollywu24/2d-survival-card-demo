@@ -15,6 +15,7 @@ import type {
   ItemStackChange,
   LogEntry,
   PlayerState,
+  SurvivorTypeResult,
   PrototypeGoal,
   PrototypeProgress,
   StatKey,
@@ -1296,16 +1297,96 @@ const getGoalCompletion = (
       return false;
   }
 };
+const survivorTypeTitleByCode: Record<string, string> = {
+  SBPC: '营地总管',
+  SBPD: '烽火领航员',
+  SBIC: '节流看守人',
+  SBID: '火堆硬汉',
+  SRPC: '沿岸筹谋家',
+  SRPD: '荒线侦察员',
+  SRIC: '漂流拾荒者',
+  SRID: '潮线赌徒',
+  FBPC: '补锅守夜人',
+  FBPD: '带伤工头',
+  FBIC: '苦熬守营人',
+  FBID: '火线莽夫',
+  FRPC: '迷途勘路者',
+  FRPD: '风暴赌徒',
+  FRIC: '硬熬漂流者',
+  FRID: '湿火柴',
+};
+
+const createSurvivorType = (
+  type: GameEnding['type'],
+  player: PlayerState,
+  progress: PrototypeProgress,
+): SurvivorTypeResult => {
+  const builtScore = [progress.campfireCrafted, progress.shelterBuilt, progress.beaconCrafted].filter(Boolean).length;
+  const roamScore = [progress.jungleExplored, progress.caveExplored, progress.spearCrafted].filter(Boolean).length;
+  const reserveScore = (player.health + player.sanity + player.temperature) / 3;
+  const prepScore = builtScore + (progress.resolvedCrises.length >= 2 ? 1 : 0) + (progress.beaconCrafted ? 1 : 0);
+
+  const steady = reserveScore >= 50 && type !== 'dead';
+  const builder = builtScore >= roamScore;
+  const prepared = prepScore >= 3;
+  const daring = progress.caveExplored || progress.spearCrafted || progress.resolvedCrises.length >= 3;
+
+  const code = `${steady ? 'S' : 'F'}${builder ? 'B' : 'R'}${prepared ? 'P' : 'I'}${daring ? 'D' : 'C'}`;
+  const label = survivorTypeTitleByCode[code] ?? '荒野求生者';
+  const traits = [
+    steady ? '稳态求生' : '带伤硬撑',
+    builder ? '建营优先' : '边走边捞',
+    prepared ? '提前铺路' : '临场拼补',
+    daring ? '敢压风险' : '先保局面',
+  ];
+
+  const tagline =
+    type === 'rescued'
+      ? '你不是碰巧获救，而是把火光提前准备好了。'
+      : type === 'dead'
+        ? '荒野不会替临场反应兜底。'
+        : prepared
+          ? '局面虽然难看，但你的营地已经开始会自己说话。'
+          : '你把自己硬拖到了第七天，但荒野也看见了你的缝补痕迹。';
+
+  const styleLine = builder
+    ? '你更像那种先把火、庇护所和工具一件件搭起来的人。'
+    : '你更像那种靠不断探索和翻找，把机会从荒野里抠出来的人。';
+  const riskLine = daring
+    ? '遇到风险时，你会选择顶着不确定性继续往前压。'
+    : '遇到风险时，你更倾向先保住眼下的体温、淡水和存货。';
+  const prepLine = prepared
+    ? '这局你的节奏是“提前铺路型”，很多关键节点都在事前做了准备。'
+    : '这局你的节奏更接近“临场拼补型”，常常是问题来了再用手头的东西去堵。';
+  const endingLine =
+    type === 'rescued'
+      ? '这种类型一旦把主线准备做顺，往往真的能把求救信号送进别人眼里。'
+      : type === 'survived'
+        ? '这种类型未必每一步都漂亮，但很擅长把局面拖到还能继续活。'
+        : '这种类型最容易倒在“我还能再拖一会儿”的那一步。';
+
+  return {
+    code,
+    label,
+    tagline,
+    summary: `你是「${label}」型求生者。${styleLine}${riskLine}${prepLine}${endingLine}`,
+    traits,
+  };
+};
 
 const createEnding = (
   type: GameEnding['type'],
   progress: PrototypeProgress,
+  player: PlayerState,
 ): GameEnding => {
+  const survivorType = createSurvivorType(type, player, progress);
+
   if (type === 'dead') {
     return {
       type,
       title: '求生失败',
       description: '你的生命值已经归零。这次荒野挑战止步于此，但日志会记住你撑到的每一天。',
+      survivorType,
     };
   }
 
@@ -1314,6 +1395,7 @@ const createEnding = (
       type,
       title: '第七天：获救',
       description: '求救信标终于发挥作用。远处船只发现了你的火光，你带着这七天的痕迹离开了海岸。',
+      survivorType,
     };
   }
 
@@ -1323,6 +1405,7 @@ const createEnding = (
     description: progress.beaconCrafted
       ? '你成功撑过七天，虽然救援没有立刻到来，但营地已经足够支撑你继续活下去。'
       : '你熬过了七天，却还没有建立起稳定的求救方案。这是生还，不是解脱。',
+    survivorType,
   };
 };
 
@@ -2188,7 +2271,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (state.player.health <= 0) {
       set({
-        ending: createEnding('dead', state.progress),
+        ending: createEnding('dead', state.progress, state.player),
       });
       return;
     }
@@ -2241,9 +2324,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       state.environment.timeOfDay === 'night' &&
       nextPhase === 'day';
     const ending = shouldEndByDeath
-      ? createEnding('dead', progressAfterTurn)
+      ? createEnding('dead', progressAfterTurn, nextPlayer)
       : shouldResolveSevenDayRun
-        ? createEnding(progressAfterTurn.beaconCrafted ? 'rescued' : 'survived', progressAfterTurn)
+        ? createEnding(progressAfterTurn.beaconCrafted ? 'rescued' : 'survived', progressAfterTurn, nextPlayer)
         : null;
 
     const currentGoal = prototypeGoals.find(

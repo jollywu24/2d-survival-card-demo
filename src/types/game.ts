@@ -46,10 +46,19 @@ export interface JournalEntry {
   text: string;
 }
 
+export interface SurvivorTypeResult {
+  code: string;
+  label: string;
+  tagline: string;
+  summary: string;
+  traits: string[];
+}
+
 export interface GameEnding {
   type: EndingType;
   title: string;
   description: string;
+  survivorType: SurvivorTypeResult;
 }
 
 export interface PrototypeProgress {
@@ -173,3 +182,4 @@ export interface LogEntry {
   id: string;
   text: string;
 }
+

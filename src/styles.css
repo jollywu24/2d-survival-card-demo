@@ -2940,10 +2940,18 @@ body {
   }
 }
 
-.item-card,
-.workbench-card,
-.backpack-card {
+.item-card {
+  touch-action: manipulation;
+}
+
+.workbench-card {
   touch-action: none;
+}
+
+.backpack-card,
+.field-backpack-grid {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .touch-drag-ghost {

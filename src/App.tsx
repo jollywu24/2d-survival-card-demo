@@ -372,6 +372,7 @@ function App() {
           moveWorkbenchStack(dragSource.cardId, undefined, stackHold.targetCardId);
         }
         setDragSource(null);
+        setTouchDrag(null);
         setStackHold(null);
         setStackProgress(0);
         return;
@@ -487,7 +488,20 @@ function App() {
         return;
       }
 
-      const distance = Math.hypot(event.clientX - touchDrag.startX, event.clientY - touchDrag.startY);
+      const deltaX = event.clientX - touchDrag.startX;
+      const deltaY = event.clientY - touchDrag.startY;
+      const distance = Math.hypot(deltaX, deltaY);
+
+      if (
+        touchDrag.kind === 'backpack' &&
+        !touchDrag.active &&
+        Math.abs(deltaX) > moveThreshold &&
+        Math.abs(deltaX) > Math.abs(deltaY) + 4
+      ) {
+        setTouchDrag(null);
+        return;
+      }
+
       const active = touchDrag.active || distance > moveThreshold;
 
       if (active && !dragSource) {

@@ -2843,3 +2843,99 @@ body {
     overflow: auto;
   }
 }
+
+@media (max-width: 900px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #root {
+    display: block;
+    min-height: 100vh;
+  }
+
+  .game-shell {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .panel-needs,
+  .panel-info,
+  .panel-field,
+  .card-workspace {
+    overflow: visible;
+  }
+
+  .panel-needs,
+  .panel-info {
+    padding-bottom: 14px;
+  }
+
+  .card-workspace {
+    grid-template-rows: auto 24px minmax(280px, 48vh) auto;
+  }
+
+  .workspace-board {
+    height: auto;
+    min-height: 280px;
+  }
+
+  .field-backpack-row {
+    overflow: visible;
+  }
+}
+
+@media (orientation: landscape) and (max-width: 960px) and (max-height: 540px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #root {
+    display: block;
+    min-height: 100vh;
+  }
+
+  .game-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    grid-template-columns: 172px minmax(0, 1fr) 236px;
+  }
+
+  .panel-needs,
+  .panel-info,
+  .panel-field {
+    overflow: visible;
+  }
+
+  .card-workspace {
+    grid-template-rows: auto 24px minmax(250px, 44vh) auto;
+  }
+
+  .workspace-board {
+    height: auto;
+    min-height: 250px;
+  }
+
+  .log-stack {
+    max-height: none;
+  }
+}

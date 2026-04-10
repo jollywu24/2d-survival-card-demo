@@ -2531,3 +2531,315 @@ body {
   line-height: 1.7;
   color: rgba(230, 214, 184, 0.8);
 }
+
+@media (orientation: landscape) and (max-width: 960px) and (max-height: 540px) {
+  .game-shell {
+    width: 100vw;
+    height: 100vh;
+    grid-template-columns: 180px minmax(0, 1fr) 248px;
+    grid-template-rows: 52px minmax(0, 1fr);
+  }
+
+  .top-bar {
+    min-height: 52px;
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .clock-wrap {
+    width: 40px;
+    height: 40px;
+  }
+
+  .clock-core {
+    width: 30px;
+    height: 30px;
+    font-size: 8px;
+  }
+
+  .game-title {
+    font-size: 15px;
+    letter-spacing: 0.08em;
+  }
+
+  .game-title span {
+    margin-left: 6px;
+    font-size: 8px;
+  }
+
+  .top-right {
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  .weather-box,
+  .btn-end-day,
+  .btn-journal,
+  .btn-subtle,
+  .btn-paper {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+
+  .panel-needs,
+  .panel-info {
+    padding: 8px;
+    gap: 8px;
+    overflow-y: auto;
+  }
+
+  .panel-field {
+    gap: 8px;
+    padding: 8px 10px 10px;
+  }
+
+  .panel-label,
+  .info-head,
+  .row-head-label,
+  .row-head-right,
+  .row-head-note {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+  }
+
+  .dst-clock-panel {
+    grid-template-columns: 72px 1fr;
+    align-items: center;
+    justify-items: start;
+    gap: 6px 8px;
+    padding: 8px;
+  }
+
+  .dst-clock-face {
+    grid-row: 1 / span 2;
+    width: 72px;
+  }
+
+  .dst-digital-clock {
+    font-size: 13px;
+  }
+
+  .time-period {
+    font-size: 8px;
+    padding: 2px 6px;
+  }
+
+  .orb-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px 4px;
+  }
+
+  .orb-ring {
+    width: 34px;
+    height: 34px;
+  }
+
+  .orb-core {
+    inset: 6px;
+  }
+
+  .orb-label {
+    font-size: 8px;
+  }
+
+  .orb-value {
+    font-size: 10px;
+  }
+
+  .left-note,
+  .selected-paper,
+  .recipe-preview {
+    margin-top: 8px;
+    padding: 8px 10px;
+  }
+
+  .left-note strong,
+  .selected-paper h3,
+  .workspace-title,
+  .recipe-title,
+  .ending-title {
+    font-size: 13px;
+  }
+
+  .left-note p,
+  .selected-paper p,
+  .recipe-line,
+  .ending-copy,
+  .survivor-type-summary,
+  .backpack-focus-card p {
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .left-note span,
+  .route-label,
+  .danger-chip,
+  .recipe-line.subtle,
+  .survivor-type-tagline,
+  .survivor-trait-chip,
+  .info-empty,
+  .log-entry,
+  .field-backpack-head {
+    font-size: 9px;
+  }
+
+  .danger-list {
+    gap: 4px;
+  }
+
+  .danger-chip {
+    padding: 6px 7px;
+  }
+
+  .terrain-switch {
+    gap: 6px;
+  }
+
+  .terrain-chip {
+    padding: 5px 7px;
+    gap: 6px;
+  }
+
+  .terrain-name {
+    font-size: 10px;
+  }
+
+  .location-lane {
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+
+  .location-card {
+    flex-basis: 108px;
+    min-height: 72px;
+    padding: 7px;
+  }
+
+  .location-title {
+    font-size: 12px;
+  }
+
+  .location-meta {
+    font-size: 9px;
+  }
+
+  .card-workspace {
+    padding: 10px 12px 10px;
+    grid-template-rows: auto 24px minmax(0, 1fr) 124px;
+    gap: 8px;
+  }
+
+  .workspace-header {
+    gap: 8px;
+    align-items: center;
+  }
+
+  .drop-zone {
+    height: 24px;
+  }
+
+  .workspace-board {
+    min-height: 0;
+  }
+
+  .workbench-card {
+    width: 94px;
+    min-height: 66px;
+    padding: 8px 8px 10px;
+  }
+
+  .stack-progress {
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .stack-progress-core {
+    width: 13px;
+    height: 13px;
+  }
+
+  .stack-amount,
+  .slot-amount {
+    font-size: 9px;
+  }
+
+  .workspace-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recipe-name,
+  .recipe-token,
+  .recipe-arrow {
+    font-size: 10px;
+  }
+
+  .craft-button {
+    margin-top: 8px;
+  }
+
+  .field-backpack-row {
+    padding: 7px 8px 8px;
+    gap: 6px;
+  }
+
+  .field-backpack-grid {
+    gap: 6px;
+  }
+
+  .field-backpack-grid .backpack-card {
+    flex-basis: 88px;
+    min-height: 78px;
+  }
+
+  .panel-info .info-section {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+
+  .carry-line,
+  .focus-meta {
+    font-size: 14px;
+  }
+
+  .backpack-focus-card {
+    padding: 10px;
+  }
+
+  .focus-icon {
+    width: 76px;
+    height: 92px;
+    font-size: 48px;
+  }
+
+  .paper-actions {
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .log-stack {
+    max-height: 132px;
+    gap: 6px;
+  }
+
+  .journal-book,
+  .crisis-card,
+  .location-action-sheet {
+    width: min(94vw, 760px);
+    max-height: 88vh;
+  }
+
+  .journal-header,
+  .crisis-header,
+  .location-action-hero {
+    padding-bottom: 8px;
+  }
+
+  .journal-body,
+  .crisis-body,
+  .location-action-list {
+    max-height: 56vh;
+    overflow: auto;
+  }
+}

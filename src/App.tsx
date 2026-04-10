@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
+﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   allCraftingRecipes,
   allPrototypeGoals,
@@ -98,6 +98,18 @@ interface WorkbenchVisualCard {
   sameItemCount: number;
 }
 
+interface TouchDragState {
+  kind: 'backpack' | 'workbench';
+  slotIndex?: number;
+  cardId?: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  active: boolean;
+}
+
 function App() {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -141,6 +153,7 @@ function App() {
     null,
   );
   const [locationModalOpen, setLocationModalOpen] = useState(false);
+  const [touchDrag, setTouchDrag] = useState<TouchDragState | null>(null);
 
   const selectedBackpackSlotData =
     selectedBackpackSlot !== null ? backpack[selectedBackpackSlot] ?? null : null;
@@ -413,6 +426,155 @@ function App() {
     );
   };
 
+  const getBoardPointFromClient = (clientX: number, clientY: number) => {
+    const rect = boardRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return DEFAULT_WORKBENCH_DROP;
+    }
+
+    const x = Math.max(
+      16,
+      Math.min(rect.width - WORKBENCH_CARD_WIDTH - 16, clientX - rect.left - WORKBENCH_CARD_WIDTH / 2),
+    );
+    const y = Math.max(
+      16,
+      Math.min(rect.height - WORKBENCH_CARD_HEIGHT - 16, clientY - rect.top - 30),
+    );
+
+    return { x, y };
+  };
+
+  const placeSelectedBackpackOnWorkbench = (slotIndex: number) => {
+    const rect = boardRef.current?.getBoundingClientRect();
+    const point = rect
+      ? {
+          x: Math.max(20, Math.min(rect.width - WORKBENCH_CARD_WIDTH - 20, rect.width * 0.5 - WORKBENCH_CARD_WIDTH / 2)),
+          y: Math.max(20, Math.min(rect.height - WORKBENCH_CARD_HEIGHT - 20, rect.height * 0.28)),
+        }
+      : DEFAULT_WORKBENCH_DROP;
+
+    moveBackpackToWorkbench(slotIndex, point);
+  };
+
+  const beginTouchDrag = (
+    source: { kind: 'backpack'; slotIndex: number } | { kind: 'workbench'; cardId: string },
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) => {
+    if (event.pointerType === 'mouse') {
+      return;
+    }
+
+    setTouchDrag({
+      ...source,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      active: false,
+    });
+  };
+
+  useEffect(() => {
+    if (!touchDrag) {
+      return;
+    }
+
+    const moveThreshold = 10;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== touchDrag.pointerId) {
+        return;
+      }
+
+      const distance = Math.hypot(event.clientX - touchDrag.startX, event.clientY - touchDrag.startY);
+      const active = touchDrag.active || distance > moveThreshold;
+
+      if (active && !dragSource) {
+        setDragSource(
+          touchDrag.kind === 'backpack'
+            ? { kind: 'backpack', slotIndex: touchDrag.slotIndex ?? 0 }
+            : { kind: 'workbench', cardId: touchDrag.cardId ?? '' },
+        );
+      }
+
+      setTouchDrag((current) =>
+        current
+          ? {
+              ...current,
+              x: event.clientX,
+              y: event.clientY,
+              active,
+            }
+          : current,
+      );
+
+      if (!active) {
+        return;
+      }
+
+      const hovered = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+      const workbenchTarget = hovered?.closest('[data-workbench-card-id]') as HTMLElement | null;
+      const targetCardId = workbenchTarget?.dataset.workbenchCardId;
+
+      if (targetCardId && canStackOnCard(targetCardId)) {
+        beginStackHold(targetCardId);
+      } else {
+        clearStackHold();
+      }
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      if (event.pointerId !== touchDrag.pointerId) {
+        return;
+      }
+
+      const hovered = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
+      const backpackTarget = hovered?.closest('[data-backpack-slot]') as HTMLElement | null;
+      const boardTarget = hovered?.closest('[data-workspace-board]') as HTMLElement | null;
+
+      if (touchDrag.active && dragSource) {
+        if (backpackTarget && dragSource.kind === 'workbench') {
+          const targetIndex = Number(backpackTarget.dataset.backpackSlot);
+          if (!Number.isNaN(targetIndex)) {
+            moveWorkbenchToBackpack(dragSource.cardId, targetIndex);
+          }
+        } else if (boardTarget) {
+          const point = getBoardPointFromClient(event.clientX, event.clientY);
+          if (dragSource.kind === 'backpack') {
+            moveBackpackToWorkbench(dragSource.slotIndex, point);
+          } else {
+            moveWorkbenchStack(dragSource.cardId, point);
+          }
+        }
+      }
+
+      clearStackHold();
+      setDragSource(null);
+      setTouchDrag(null);
+    };
+
+    const handlePointerCancel = (event: PointerEvent) => {
+      if (event.pointerId !== touchDrag.pointerId) {
+        return;
+      }
+
+      clearStackHold();
+      setDragSource(null);
+      setTouchDrag(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerCancel);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerCancel);
+    };
+  }, [touchDrag, dragSource, moveBackpackToWorkbench, moveWorkbenchStack, moveWorkbenchToBackpack]);
+
   const handleBackpackClick = (slot: BackpackSlot) => {
     if (selectedBackpackSlot !== null && selectedBackpackSlot !== slot.slotIndex) {
       moveSelectedToSlot(slot.slotIndex);
@@ -480,8 +642,22 @@ function App() {
     exploreTerrainDrops(activeTerrain);
   };
 
+  const touchDragItem = touchDrag
+    ? touchDrag.kind === 'backpack'
+      ? getItemDefinition(backpack[touchDrag.slotIndex ?? -1]?.itemId ?? null)
+      : getItemDefinition(workbench.find((card) => card.id === touchDrag.cardId)?.itemId ?? null)
+    : null;
+
+  const touchDragGhostStyle = touchDrag
+    ? ({
+        left: `${touchDrag.x - WORKBENCH_CARD_WIDTH / 2}px`,
+        top: `${touchDrag.y - WORKBENCH_CARD_HEIGHT / 2}px`,
+      } as CSSProperties)
+    : null;
+
   const renderBackpackCard = (slot: BackpackSlot) => {
     const item = getItemDefinition(slot.itemId);
+
     return (
       <button
         key={`backpack-${slot.slotIndex}`}
@@ -501,6 +677,8 @@ function App() {
         }}
         onDragOver={(event) => event.preventDefault()}
         onDrop={() => handleBackpackDrop(slot.slotIndex)}
+        data-backpack-slot={slot.slotIndex}
+        onPointerDown={(event) => item && beginTouchDrag({ kind: 'backpack', slotIndex: slot.slotIndex }, event)}
       >
         <span className="slot-index">B{slot.slotIndex + 1}</span>
         {item ? (
@@ -567,6 +745,8 @@ function App() {
           }
         }}
         onDrop={handleWorkbenchCardDrop}
+        data-workbench-card-id={card.id}
+        onPointerDown={(event) => beginTouchDrag({ kind: 'workbench', cardId: card.id }, event)}
       >
         <span className="slot-index">W</span>
         {item ? (
@@ -767,6 +947,7 @@ function App() {
             <div
               ref={boardRef}
               className={`workspace-board ${dragSource ? 'dragging' : ''}`}
+              data-workspace-board="true"
               onDragOver={(event) => {
                 event.preventDefault();
                 clearStackHold();
@@ -860,11 +1041,21 @@ function App() {
           activeEvent={!!activeEvent}
           ending={ending}
           onUseBackpackItem={useBackpackItem}
+          onStageBackpackItem={placeSelectedBackpackOnWorkbench}
           onDiscardBackpackItem={discardBackpackItem}
           logs={logs}
           day={environment.day}
         />
       </main>
+
+      {touchDrag?.active && touchDragItem && touchDragGhostStyle && (
+        <div className="touch-drag-ghost item-card" style={touchDragGhostStyle} aria-hidden="true">
+          <span className="item-card-icon">{touchDragItem.icon}</span>
+          <span className="item-card-name">{touchDragItem.name}</span>
+          <span className="item-card-type">{itemTypeLabel[touchDragItem.type]}</span>
+        </div>
+      )}
+
 
       <div className={`location-action-modal ${locationModalOpen ? 'open' : ''}`} onClick={() => setLocationModalOpen(false)}>
         <div className="location-action-sheet" onClick={(event) => event.stopPropagation()}>

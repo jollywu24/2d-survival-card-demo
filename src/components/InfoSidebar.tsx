@@ -9,6 +9,7 @@ interface InfoSidebarProps {
   activeEvent: boolean;
   ending: GameEnding | null;
   onUseBackpackItem: (slotIndex: number) => void;
+  onStageBackpackItem: (slotIndex: number) => void;
   onDiscardBackpackItem: (slotIndex: number) => void;
   logs: LogEntry[];
   day: number;
@@ -23,6 +24,7 @@ export function InfoSidebar({
   activeEvent,
   ending,
   onUseBackpackItem,
+  onStageBackpackItem,
   onDiscardBackpackItem,
   logs,
   day,
@@ -88,6 +90,14 @@ export function InfoSidebar({
                 onClick={() => onUseBackpackItem(selectedBackpackSlotData.slotIndex)}
               >
                 使用
+              </button>
+              <button
+                type="button"
+                className="btn-paper"
+                disabled={activeEvent || !!ending}
+                onClick={() => onStageBackpackItem(selectedBackpackSlotData.slotIndex)}
+              >
+                制作
               </button>
               <button
                 type="button"

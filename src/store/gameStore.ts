@@ -568,9 +568,7 @@ const craftingRecipes: CraftingRecipe[] = [
     id: 'stone-knife',
     name: '石刀',
     description: '把两块海滩小石子叠在一起，边缘磨出了一把最原始也最关键的石刀。',
-    requires: [
-      { itemId: 'pebble', amount: 2 },
-    ],
+    requires: [{ itemId: 'pebble', amount: 2 }],
     produces: [{ itemId: 'stone-knife', amount: 1 }],
     category: 'tool',
   },
@@ -620,6 +618,17 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'food',
   },
   {
+    id: 'campfire-kit',
+    name: '火种包',
+    description: '把椰纤维和叶片卷在一起，做成一包更容易引燃的干火种。',
+    requires: [
+      { itemId: 'coconut-husk', amount: 1 },
+      { itemId: 'palm-leaf', amount: 1 },
+    ],
+    produces: [{ itemId: 'campfire-kit', amount: 1 }],
+    category: 'tool',
+  },
+  {
     id: 'campfire',
     name: '篝火',
     description: '木材与燧石在工作台上堆出一个稳定火源，夜里终于有了真正的中心。',
@@ -665,6 +674,16 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'tool',
   },
   {
+    id: 'herb-bundle',
+    name: '草药包',
+    description: '把最常用的草药先绑成一小包，至少能在手忙脚乱时先压住伤势。',
+    requires: [
+      { itemId: 'herb', amount: 2 },
+    ],
+    produces: [{ itemId: 'herb-bundle', amount: 1 }],
+    category: 'medical',
+  },
+  {
     id: 'herb-salve',
     name: '草药药膏',
     description: '草药和净水揉在一起，做出的药膏终于能真正处理那些拖人的小伤。',
@@ -685,6 +704,18 @@ const craftingRecipes: CraftingRecipe[] = [
     ],
     produces: [{ itemId: 'water-collector', amount: 1 }],
     category: 'building',
+  },
+  {
+    id: 'workbench-spear',
+    name: '木矛',
+    description: '木材、竹节和藤蔓在台面上绑成一根像样的木矛，终于不再只能空手面对夜里的东西。',
+    requires: [
+      { itemId: 'driftwood', amount: 1 },
+      { itemId: 'bamboo', amount: 1 },
+      { itemId: 'vine', amount: 1 },
+    ],
+    produces: [{ itemId: 'spear', amount: 1 }],
+    category: 'tool',
   },
   {
     id: 'simple-trap',
@@ -753,7 +784,6 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'skill',
   },
 ];
-
 const prototypeGoals: PrototypeGoal[] = [
   {
     id: 'stabilize-body',
@@ -1116,6 +1146,9 @@ const getEventContextEffect = (
   const hasShelter = hasOwnedItem(backpack, workbench, 'temporary-shelter');
   const hasWrap = hasOwnedItem(backpack, workbench, 'waterproof-wrap');
   const hasSpear = hasOwnedItem(backpack, workbench, 'spear');
+  const hasMedicine =
+    hasOwnedItem(backpack, workbench, 'herb-bundle') ||
+    hasOwnedItem(backpack, workbench, 'herb-salve');
   const hasTrap = hasOwnedItem(backpack, workbench, 'simple-trap');
   const hasContainer = hasOwnedItem(backpack, workbench, 'clean-container');
   const hasCollector = hasOwnedItem(backpack, workbench, 'water-collector');
@@ -1155,6 +1188,10 @@ const getEventContextEffect = (
       effects.push({ statChanges: { sanity: 3 } });
       notes.push('营地边的陷阱拖慢了它冲进来的节奏。');
     }
+    if (hasMedicine) {
+      effects.push({ statChanges: { health: 3, sanity: 1 } });
+      notes.push('你手边的草药包至少把擦伤和慌乱压了下去。');
+    }
   }
 
   if (event.id === 'dirty-water') {
@@ -1168,6 +1205,10 @@ const getEventContextEffect = (
     if (hasCollector) {
       effects.push({ statChanges: { sanity: 2 } });
       notes.push('集水装置让你知道自己还没完全断水。');
+    }
+    if (hasMedicine) {
+      effects.push({ statChanges: { health: 2 } });
+      notes.push('你提前留的草药让坏水带来的后劲没那么重。');
     }
   }
 

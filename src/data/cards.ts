@@ -200,5 +200,140 @@ export const starterDeck: CardDefinition[] = [
       allowedTime: ['day', 'dusk'],
     },
   },
+  {
+    id: 'chop-driftwood',
+    name: '砍伐木材',
+    type: 'action',
+    actionCost: 2,
+    description: '沿着潮线和林边收集可用的木材，为火源和工具做准备。',
+    effect: {
+      statChanges: { fatigue: -8, thirst: -3 },
+      gainItems: [{ itemId: 'driftwood', amount: 2 }],
+    },
+    condition: {
+      allowedTerrains: ['beach', 'jungle'],
+      allowedTime: ['day'],
+    },
+  },
+  {
+    id: 'gather-herbs',
+    name: '采集草药',
+    type: 'action',
+    actionCost: 1,
+    description: '在湿润地带辨认可用草药，为后续处理伤口和坏水做准备。',
+    effect: {
+      statChanges: { sanity: 2, fatigue: -5 },
+      gainItems: [
+        { itemId: 'herb', amount: 2 },
+        { itemId: 'berries', amount: 1 },
+      ],
+    },
+    condition: {
+      allowedTerrains: ['jungle', 'cave'],
+      allowedTime: ['day'],
+    },
+  },
+  {
+    id: 'scavenge-wreckage',
+    name: '捡拾漂流物',
+    type: 'action',
+    actionCost: 1,
+    description: '翻找潮水送来的碎片，有时能捡到现成的引火物和绑扎材料。',
+    effect: {
+      statChanges: { fatigue: -4, sanity: 1 },
+      eventChanceBonus: 0.05,
+      gainItems: [
+        { itemId: 'driftwood', amount: 1 },
+        { itemId: 'vine', amount: 1 },
+        { itemId: 'campfire-kit', amount: 1 },
+      ],
+    },
+    condition: {
+      allowedTerrains: ['beach'],
+      allowedTime: ['day'],
+    },
+  },
+  {
+    id: 'dig-cave',
+    name: '挖掘洞穴',
+    type: 'action',
+    actionCost: 2,
+    description: '沿着洞口和碎石带继续挖找，补齐做刀和容器最缺的矿料。',
+    effect: {
+      statChanges: { fatigue: -9, sanity: -2 },
+      gainItems: [
+        { itemId: 'flint', amount: 1 },
+        { itemId: 'stone', amount: 1 },
+        { itemId: 'pebble', amount: 1 },
+      ],
+    },
+    condition: {
+      allowedTerrains: ['cave'],
+      allowedTime: ['day'],
+    },
+  },
+  {
+    id: 'observe-rest',
+    name: '观景休憩',
+    type: 'skill',
+    actionCost: 0,
+    description: '暂时停下来听海风和浪声，让脑子别一直绷在求生模式里。',
+    effect: {
+      statChanges: { sanity: 10, fatigue: 6 },
+    },
+    condition: {
+      allowedTerrains: ['beach'],
+      allowedTime: ['day', 'dusk'],
+    },
+  },
+  {
+    id: 'follow-tracks',
+    name: '循迹狩猎',
+    type: 'action',
+    actionCost: 2,
+    description: '沿着林地里的踩踏痕迹慢慢追，运气好能带回求救线最缺的兽皮。',
+    effect: {
+      statChanges: { fatigue: -10, thirst: -5, sanity: -1 },
+      gainItems: [
+        { itemId: 'beast-hide', amount: 1 },
+        { itemId: 'vine', amount: 1 },
+      ],
+    },
+    condition: {
+      allowedTerrains: ['jungle'],
+      allowedTime: ['day', 'dusk'],
+    },
+  },
+  {
+    id: 'purify-water',
+    name: '净化水源',
+    type: 'recipe',
+    actionCost: 1,
+    description: '把现有容器和火源利用起来，把不放心的水处理成能入口的样子。',
+    effect: {
+      statChanges: { thirst: 10, sanity: 2, fatigue: -3 },
+      gainItems: [{ itemId: 'fresh-water', amount: 1 }],
+    },
+    condition: {
+      allowedTime: ['day', 'dusk'],
+    },
+  },
+  {
+    id: 'reinforce-camp',
+    name: '加固营地',
+    type: 'recipe',
+    actionCost: 2,
+    description: '把现有营地再缠紧一点，至少让今晚的风雨别直接灌进来。',
+    effect: {
+      statChanges: { sanity: 4, fatigue: -6 },
+      gainItems: [
+        { itemId: 'waterproof-wrap', amount: 1 },
+        { itemId: 'palm-leaf', amount: 1 },
+      ],
+    },
+    condition: {
+      allowedTime: ['day', 'dusk'],
+    },
+  },
 ];
 

@@ -203,16 +203,26 @@ const applyEffect = (
   return { player: nextPlayer, environment: nextEnvironment };
 };
 
-const rotateDeck = (deck: CardDefinition[], hand: CardDefinition[], drawCount: number) => {
-  const available = deck.filter((card) => !hand.some((handCard) => handCard.id === card.id));
-  const nextHand = [...hand];
+const drawRandomCards = (
+  deck: CardDefinition[],
+  excludedIds: string[],
+  drawCount: number,
+) => {
+  const available = deck.filter((card) => !excludedIds.includes(card.id));
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.max(0, drawCount));
+};
 
-  for (let i = 0; i < drawCount; i += 1) {
-    const candidate = available[i % Math.max(available.length, 1)];
-    if (candidate && !nextHand.some((card) => card.id === candidate.id)) {
+const rotateDeck = (deck: CardDefinition[], hand: CardDefinition[], drawCount: number) => {
+  const nextHand = [...hand];
+  const drawIds = nextHand.map((card) => card.id);
+  const draws = drawRandomCards(deck, drawIds, drawCount);
+
+  draws.forEach((candidate) => {
+    if (!nextHand.some((card) => card.id === candidate.id)) {
       nextHand.push(candidate);
     }
-  }
+  });
 
   return nextHand.slice(0, HAND_SIZE);
 };
@@ -873,24 +883,33 @@ const getWorkbenchRecipeMatch = (
     return null;
   }
 
+  const stackCards = getWorkbenchStackCards(workbench, selectedCard.stackId);
   const occupiedCounts = countWorkbenchStackItems(workbench, selectedCard.stackId);
-  const entries = [...occupiedCounts.entries()];
 
-  if (entries.length === 0) {
+  if (stackCards.length === 0) {
     return null;
   }
 
-  return (
-    craftingRecipes.find((recipe) => {
-      if (entries.length !== recipe.requires.length) {
-        return false;
+  const rankedMatches = craftingRecipes
+    .filter((recipe) =>
+      recipe.requires.every(
+        (requirement) => (occupiedCounts.get(requirement.itemId) ?? 0) >= requirement.amount,
+      ),
+    )
+    .sort((left, right) => {
+      const leftTotal = left.requires.reduce((sum, entry) => sum + entry.amount, 0);
+      const rightTotal = right.requires.reduce((sum, entry) => sum + entry.amount, 0);
+      const leftExact = leftTotal === stackCards.length ? 1 : 0;
+      const rightExact = rightTotal === stackCards.length ? 1 : 0;
+
+      if (leftExact !== rightExact) {
+        return rightExact - leftExact;
       }
 
-      return recipe.requires.every(
-        (requirement) => occupiedCounts.get(requirement.itemId) === requirement.amount,
-      );
-    }) ?? null
-  );
+      return rightTotal - leftTotal;
+    });
+
+  return rankedMatches[0] ?? null;
 };
 const consumeItemsFromBackpack = (backpack: BackpackSlot[], requirements: ItemStackChange[]) => {
   const nextBackpack = cloneBackpack(backpack);
@@ -1235,7 +1254,7 @@ const createInitialState = () => {
     environment: initialEnvironment(),
     progress: initialProgress(),
     deck: starterDeck,
-    hand: starterDeck.slice(0, HAND_SIZE),
+    hand: drawRandomCards(starterDeck, [], HAND_SIZE),
     backpack: seeded,
     workbench: createInitialWorkbench(),
     selectedBackpackSlot: null as number | null,
@@ -1565,13 +1584,13 @@ const applySleepRecovery = (player: PlayerState) =>
     health: 3,
   });
 const terrainDropPool: Record<EnvironmentState['terrain'], string[]> = {
-  beach: ['green-coconut', 'driftwood', 'pebble', 'palm-leaf'],
-  jungle: ['driftwood', 'vine', 'herb', 'bamboo', 'berries'],
-  cave: ['flint', 'stone', 'herb', 'pebble'],
+  beach: ['green-coconut', 'green-coconut', 'driftwood', 'driftwood', 'pebble', 'pebble', 'palm-leaf', 'vine', 'campfire-kit'],
+  jungle: ['driftwood', 'vine', 'vine', 'herb', 'herb', 'bamboo', 'bamboo', 'berries', 'green-coconut'],
+  cave: ['flint', 'flint', 'stone', 'stone', 'herb', 'pebble', 'fresh-water'],
 };
 const pickRandomTerrainDrops = (terrain: EnvironmentState['terrain']) => {
   const pool = terrainDropPool[terrain];
-  const count = terrain === 'beach' ? 3 + Math.floor(Math.random() * 2) : 2 + Math.floor(Math.random() * 2);
+  const count = terrain === 'beach' ? 3 + Math.floor(Math.random() * 2) : terrain === 'jungle' ? 3 : 2 + Math.floor(Math.random() * 2);
   return Array.from({ length: count }, () => pool[Math.floor(Math.random() * pool.length)]);
 };
 
@@ -2455,6 +2474,8 @@ export const isPrototypeGoalComplete = (
   player: PlayerState,
   progress: PrototypeProgress,
 ) => getGoalCompletion(goal.id, player, progress);
+
+
 
 
 

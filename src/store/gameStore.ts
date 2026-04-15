@@ -911,6 +911,42 @@ const getWorkbenchRecipeMatch = (
 
   return rankedMatches[0] ?? null;
 };
+
+const findWorkbenchCraftTarget = (
+  workbench: WorkbenchCard[],
+  selectedWorkbenchCardId: string | null,
+) => {
+  if (selectedWorkbenchCardId) {
+    const selectedCard = getWorkbenchCard(workbench, selectedWorkbenchCardId);
+    const selectedRecipe = getWorkbenchRecipeMatch(workbench, selectedWorkbenchCardId);
+
+    if (selectedCard && selectedRecipe) {
+      return {
+        card: selectedCard,
+        recipe: selectedRecipe,
+      };
+    }
+  }
+
+  const visitedStacks = new Set<string>();
+
+  for (const card of workbench) {
+    if (visitedStacks.has(card.stackId)) {
+      continue;
+    }
+    visitedStacks.add(card.stackId);
+
+    const recipe = getWorkbenchRecipeMatch(workbench, card.id);
+    if (recipe) {
+      return {
+        card,
+        recipe,
+      };
+    }
+  }
+
+  return null;
+};
 const consumeItemsFromBackpack = (backpack: BackpackSlot[], requirements: ItemStackChange[]) => {
   const nextBackpack = cloneBackpack(backpack);
 
@@ -2238,15 +2274,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const recipe = getWorkbenchRecipeMatch(state.workbench, state.selectedWorkbenchCardId);
-    if (!recipe || !state.selectedWorkbenchCardId) {
+    const craftTarget = findWorkbenchCraftTarget(state.workbench, state.selectedWorkbenchCardId);
+    if (!craftTarget) {
+      set((current) => ({
+        logs: [createLog('当前工作台上没有可完成的配方。'), ...current.logs].slice(0, 10),
+      }));
       return;
     }
 
-    const selectedCard = getWorkbenchCard(state.workbench, state.selectedWorkbenchCardId);
-    if (!selectedCard) {
-      return;
-    }
+    const { card: selectedCard, recipe } = craftTarget;
     const actionCost = 1;
     const timeCost = toTimeCost(actionCost);
     if (!canAffordAction(state.environment, timeCost)) {
@@ -2467,7 +2503,7 @@ export const canCraftInBackpack = (backpack: BackpackSlot[], recipe: CraftingRec
 export const getWorkbenchRecipePreview = (
   workbench: WorkbenchCard[],
   selectedWorkbenchCardId: string | null,
-) => getWorkbenchRecipeMatch(workbench, selectedWorkbenchCardId);
+) => findWorkbenchCraftTarget(workbench, selectedWorkbenchCardId)?.recipe ?? null;
 export const allPrototypeGoals = prototypeGoals;
 export const isPrototypeGoalComplete = (
   goal: PrototypeGoal,

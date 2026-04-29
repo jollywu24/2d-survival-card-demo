@@ -16,7 +16,7 @@ import {
   weatherLabel,
 } from './store/gameStore';
 import { InfoSidebar } from './components/InfoSidebar';
-import type { BackpackSlot, EnvironmentState, WorkbenchCard } from './types/game';
+import type { BackpackSlot, CraftingRecipe, EnvironmentState, WorkbenchCard } from './types/game';
 
 const survivalOrbMeta = [
   { key: 'hunger', label: '饱腹', cls: 'orb-hunger', invert: false },
@@ -46,6 +46,28 @@ const itemTypeLabel = {
   water: '饮水',
   medical: '药品',
 } as const;
+
+type RecipeFilter = 'ready' | 'all' | NonNullable<CraftingRecipe['category']>;
+
+const recipeCategoryLabel: Record<NonNullable<CraftingRecipe['category']>, string> = {
+  building: '营地',
+  food: '食物',
+  tool: '工具',
+  medical: '医疗',
+  goal: '主线',
+  skill: '精神',
+};
+
+const recipeFilterOptions: Array<{ id: RecipeFilter; label: string }> = [
+  { id: 'ready', label: '可制作' },
+  { id: 'all', label: '全部' },
+  { id: 'food', label: '食物' },
+  { id: 'tool', label: '工具' },
+  { id: 'building', label: '营地' },
+  { id: 'medical', label: '医疗' },
+  { id: 'goal', label: '主线' },
+  { id: 'skill', label: '精神' },
+];
 const phaseMinuteRange = {
   day: { start: 6 * 60, length: 12 * 60 },
   dusk: { start: 18 * 60, length: 4 * 60 },
@@ -154,6 +176,7 @@ function App() {
   const [selectedActionTerrain, setSelectedActionTerrain] = useState<EnvironmentState['terrain'] | null>(
     null,
   );
+  const [recipeFilter, setRecipeFilter] = useState<RecipeFilter>('ready');
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [touchDrag, setTouchDrag] = useState<TouchDragState | null>(null);
 
@@ -178,13 +201,44 @@ function App() {
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
   const recipeBookEntries = useMemo(
-    () =>
-      allCraftingRecipes
+    () => {
+      const entries = allCraftingRecipes
         .map((recipe) => ({
           recipe,
           craftable: canCraftWithOwnedItems(backpack, workbench, recipe),
         }))
-        .sort((left, right) => Number(right.craftable) - Number(left.craftable)),
+        .filter((entry) => {
+          if (recipeFilter === 'ready') {
+            return entry.craftable;
+          }
+          if (recipeFilter === 'all') {
+            return true;
+          }
+          return entry.recipe.category === recipeFilter;
+        })
+        .sort((left, right) => {
+          const craftableDiff = Number(right.craftable) - Number(left.craftable);
+          if (craftableDiff !== 0) {
+            return craftableDiff;
+          }
+          return left.recipe.name.localeCompare(right.recipe.name, 'zh-Hans-CN');
+        });
+
+      if (entries.length > 0 || recipeFilter === 'all') {
+        return entries;
+      }
+
+      return allCraftingRecipes
+        .map((recipe) => ({
+          recipe,
+          craftable: canCraftWithOwnedItems(backpack, workbench, recipe),
+        }))
+        .sort((left, right) => Number(right.craftable) - Number(left.craftable));
+    },
+    [backpack, workbench, recipeFilter],
+  );
+  const readyRecipeCount = useMemo(
+    () => allCraftingRecipes.filter((recipe) => canCraftWithOwnedItems(backpack, workbench, recipe)).length,
     [backpack, workbench],
   );
   const activeGoal = allPrototypeGoals.find(
@@ -1035,20 +1089,35 @@ function App() {
               <div className="recipe-book">
                 <div className="recipe-book-head">
                   <div>
-                    <div className="recipe-title">合成列表</div>
+                    <div className="recipe-title">制作栏</div>
                     <div className="recipe-book-sub">
-                      {recipeBookEntries.filter((entry) => entry.craftable).length}/{allCraftingRecipes.length} 可制作
+                      {readyRecipeCount}/{allCraftingRecipes.length} 可制作
                     </div>
                   </div>
                   <span className="recipe-book-mark">营地手册</span>
                 </div>
+                <div className="recipe-filter-row" role="tablist" aria-label="合成分类">
+                  {recipeFilterOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`recipe-filter-chip ${recipeFilter === option.id ? 'active' : ''}`}
+                      onClick={() => setRecipeFilter(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="recipe-book-list">
-                  {recipeBookEntries.map(({ recipe, craftable }) => (
+                  {recipeBookEntries.length > 0 ? recipeBookEntries.map(({ recipe, craftable }) => (
                     <div key={recipe.id} className={`recipe-book-item ${craftable ? 'ready' : ''}`}>
                       <div className="recipe-book-main">
                         <div className="recipe-book-name">
                           {getItemDefinition(recipe.produces[0]?.itemId ?? null)?.icon}
                           <span>{recipe.name}</span>
+                        </div>
+                        <div className={`recipe-category category-${recipe.category ?? 'tool'}`}>
+                          {recipe.category ? recipeCategoryLabel[recipe.category] : '配方'}
                         </div>
                         <div className="recipe-book-output">
                           {recipe.produces
@@ -1078,10 +1147,14 @@ function App() {
                         title={craftable ? `制作 ${recipe.name}` : '材料不足'}
                         aria-label={craftable ? `制作 ${recipe.name}` : `${recipe.name} 材料不足`}
                       >
-                        {craftable ? '制' : '缺'}
+                        {craftable ? '制作' : '缺料'}
                       </button>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="recipe-book-empty">
+                      暂无该分类配方
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

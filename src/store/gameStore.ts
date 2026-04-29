@@ -639,12 +639,31 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'tool',
   },
   {
+    id: 'fiber-rope',
+    name: '纤维绳',
+    description: '把两段藤蔓反复搓紧，做成一截更结实、更适合长期建造的绳索。',
+    requires: [{ itemId: 'vine', amount: 2 }],
+    produces: [{ itemId: 'floating-rope', amount: 1 }],
+    category: 'tool',
+  },
+  {
     id: 'campfire',
     name: '篝火',
     description: '木材与燧石在工作台上堆出一个稳定火源，夜里终于有了真正的中心。',
     requires: [
       { itemId: 'driftwood', amount: 2 },
       { itemId: 'flint', amount: 1 },
+    ],
+    produces: [{ itemId: 'campfire', amount: 1 }],
+    category: 'building',
+  },
+  {
+    id: 'kindled-campfire',
+    name: '点燃篝火',
+    description: '现成火种包让生火不再完全依赖燧石，几段木材就能撑起夜里的火光。',
+    requires: [
+      { itemId: 'driftwood', amount: 2 },
+      { itemId: 'campfire-kit', amount: 1 },
     ],
     produces: [{ itemId: 'campfire', amount: 1 }],
     category: 'building',
@@ -662,6 +681,30 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'food',
   },
   {
+    id: 'roasted-insects',
+    name: '烤虫蛋白',
+    description: '把虫蛋白在火边快速烤熟，味道谈不上好，但至少更安全、更顶饿。',
+    requires: [
+      { itemId: 'insect-protein', amount: 1 },
+      { itemId: 'campfire', amount: 1 },
+    ],
+    preserves: [{ itemId: 'campfire', amount: 1 }],
+    produces: [{ itemId: 'roasted-insects', amount: 1 }],
+    category: 'food',
+  },
+  {
+    id: 'trail-ration',
+    name: '应急口粮',
+    description: '浆果和椰肉包在叶片里，变成一份更适合留到危急时刻的口粮。',
+    requires: [
+      { itemId: 'berries', amount: 1 },
+      { itemId: 'coconut-meat', amount: 1 },
+      { itemId: 'palm-leaf', amount: 1 },
+    ],
+    produces: [{ itemId: 'trail-ration', amount: 1 }],
+    category: 'food',
+  },
+  {
     id: 'temporary-shelter',
     name: '临时庇护所',
     description: '棕榈叶和藤蔓叠在一起，很自然就长成了一顶挡风避雨的小 shelter。',
@@ -673,12 +716,34 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'building',
   },
   {
+    id: 'lashed-shelter',
+    name: '绑扎庇护所',
+    description: '用更可靠的绳索替代一部分藤蔓，庇护所成形得更快，也更稳。',
+    requires: [
+      { itemId: 'palm-leaf', amount: 2 },
+      { itemId: 'floating-rope', amount: 1 },
+    ],
+    produces: [{ itemId: 'temporary-shelter', amount: 1 }],
+    category: 'building',
+  },
+  {
     id: 'flint-knife',
     name: '燧石刀',
     description: '尖石加上藤蔓固定，很快就能做出第一把像样的切割工具。',
     requires: [
       { itemId: 'flint', amount: 2 },
       { itemId: 'vine', amount: 1 },
+    ],
+    produces: [{ itemId: 'flint-knife', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'bound-flint-knife',
+    name: '绑扎燧石刀',
+    description: '漂流绳把燧石牢牢固定起来，少一点材料也能做出可靠刀具。',
+    requires: [
+      { itemId: 'flint', amount: 1 },
+      { itemId: 'floating-rope', amount: 1 },
     ],
     produces: [{ itemId: 'flint-knife', amount: 1 }],
     category: 'tool',
@@ -716,6 +781,18 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'building',
   },
   {
+    id: 'rain-barrel',
+    name: '雨水桶',
+    description: '竹节、椰壳和绳索拼成储水桶，雨天时终于能留住更多水。',
+    requires: [
+      { itemId: 'bamboo', amount: 1 },
+      { itemId: 'coconut-bowl', amount: 1 },
+      { itemId: 'floating-rope', amount: 1 },
+    ],
+    produces: [{ itemId: 'rain-barrel', amount: 1 }],
+    category: 'building',
+  },
+  {
     id: 'workbench-spear',
     name: '木矛',
     description: '木材、竹节和藤蔓在台面上绑成一根像样的木矛，终于不再只能空手面对夜里的东西。',
@@ -723,6 +800,18 @@ const craftingRecipes: CraftingRecipe[] = [
       { itemId: 'driftwood', amount: 1 },
       { itemId: 'bamboo', amount: 1 },
       { itemId: 'vine', amount: 1 },
+    ],
+    produces: [{ itemId: 'spear', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'lashed-spear',
+    name: '绑扎木矛',
+    description: '漂流绳让矛头更牢，少找一段藤蔓也能把武器做出来。',
+    requires: [
+      { itemId: 'driftwood', amount: 1 },
+      { itemId: 'bamboo', amount: 1 },
+      { itemId: 'floating-rope', amount: 1 },
     ],
     produces: [{ itemId: 'spear', amount: 1 }],
     category: 'tool',
@@ -739,12 +828,34 @@ const craftingRecipes: CraftingRecipe[] = [
     category: 'tool',
   },
   {
+    id: 'rope-trap',
+    name: '绳索陷阱',
+    description: '漂流绳拉出更稳定的机关，比单靠藤蔓更适合长期放在营地边缘。',
+    requires: [
+      { itemId: 'driftwood', amount: 1 },
+      { itemId: 'floating-rope', amount: 1 },
+    ],
+    produces: [{ itemId: 'simple-trap', amount: 1 }],
+    category: 'tool',
+  },
+  {
     id: 'waterproof-wrap',
     name: '防水包裹',
     description: '把棕榈叶和藤蔓反复包扎，关键物资终于不再一淋就完蛋。',
     requires: [
       { itemId: 'palm-leaf', amount: 1 },
       { itemId: 'vine', amount: 1 },
+    ],
+    produces: [{ itemId: 'waterproof-wrap', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'hide-wrap',
+    name: '兽皮防水包',
+    description: '兽皮和绳索包住关键物资，风暴里最怕湿掉的东西终于有了保护。',
+    requires: [
+      { itemId: 'beast-hide', amount: 1 },
+      { itemId: 'floating-rope', amount: 1 },
     ],
     produces: [{ itemId: 'waterproof-wrap', amount: 1 }],
     category: 'tool',
@@ -759,6 +870,30 @@ const craftingRecipes: CraftingRecipe[] = [
     ],
     produces: [{ itemId: 'clean-container', amount: 1 }],
     category: 'tool',
+  },
+  {
+    id: 'coconut-filter',
+    name: '椰壳滤器',
+    description: '椰子碗、石块和棕榈叶叠成粗糙滤器，坏水也有了处理余地。',
+    requires: [
+      { itemId: 'coconut-bowl', amount: 1 },
+      { itemId: 'stone', amount: 1 },
+      { itemId: 'palm-leaf', amount: 1 },
+    ],
+    produces: [{ itemId: 'clean-container', amount: 1 }],
+    category: 'tool',
+  },
+  {
+    id: 'warm-bedding',
+    name: '简易卧铺',
+    description: '兽皮压住棕榈叶，绑成一张低矮卧铺，夜里不再完全贴着冷地。',
+    requires: [
+      { itemId: 'beast-hide', amount: 1 },
+      { itemId: 'palm-leaf', amount: 2 },
+      { itemId: 'vine', amount: 1 },
+    ],
+    produces: [{ itemId: 'warm-bedding', amount: 1 }],
+    category: 'building',
   },
   {
     id: 'dried-meat',
@@ -779,6 +914,20 @@ const craftingRecipes: CraftingRecipe[] = [
     requires: [
       { itemId: 'campfire', amount: 1 },
       { itemId: 'spear', amount: 1 },
+      { itemId: 'beast-hide', amount: 1 },
+    ],
+    preserves: [{ itemId: 'campfire', amount: 1 }],
+    produces: [{ itemId: 'signal-beacon', amount: 1 }],
+    category: 'goal',
+  },
+  {
+    id: 'signal-tower',
+    name: '信号塔架',
+    description: '竹节和漂流绳把信号抬高，兽皮在火光边更容易被远处看见。',
+    requires: [
+      { itemId: 'campfire', amount: 1 },
+      { itemId: 'bamboo', amount: 2 },
+      { itemId: 'floating-rope', amount: 1 },
       { itemId: 'beast-hide', amount: 1 },
     ],
     preserves: [{ itemId: 'campfire', amount: 1 }],
@@ -868,6 +1017,23 @@ const countWorkbenchStackItems = (workbench: WorkbenchCard[], stackId: string) =
 const canCraftRecipeFromBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) => {
   const itemCounts = countSlotItems(backpack);
   return recipe.requires.every((requirement) => (itemCounts.get(requirement.itemId) ?? 0) >= requirement.amount);
+};
+
+const getRecipeConsumedRequirements = (recipe: CraftingRecipe) => {
+  const preserveCounts = new Map<string, number>();
+  (recipe.preserves ?? []).forEach((entry) => {
+    preserveCounts.set(entry.itemId, (preserveCounts.get(entry.itemId) ?? 0) + entry.amount);
+  });
+
+  return recipe.requires
+    .map((entry) => {
+      const preserved = preserveCounts.get(entry.itemId) ?? 0;
+      return {
+        itemId: entry.itemId,
+        amount: Math.max(0, entry.amount - preserved),
+      };
+    })
+    .filter((entry) => entry.amount > 0);
 };
 
 const getWorkbenchRecipeMatch = (
@@ -983,11 +1149,8 @@ const removeWorkbenchCardsForRecipe = (
   });
 
   const consumeCounts = new Map<string, number>();
-  recipe.requires.forEach((entry) => {
+  getRecipeConsumedRequirements(recipe).forEach((entry) => {
     consumeCounts.set(entry.itemId, (consumeCounts.get(entry.itemId) ?? 0) + entry.amount);
-  });
-  preserveCounts.forEach((amount, itemId) => {
-    consumeCounts.set(itemId, Math.max(0, (consumeCounts.get(itemId) ?? 0) - amount));
   });
 
   return cloneWorkbench(workbench).filter((card) => {
@@ -1102,9 +1265,11 @@ const getPassiveTransitionOutcome = (
   const hasCampfire = hasOwnedItem(backpack, workbench, 'campfire');
   const hasShelter = hasOwnedItem(backpack, workbench, 'temporary-shelter');
   const hasCollector = hasOwnedItem(backpack, workbench, 'water-collector');
+  const hasRainBarrel = hasOwnedItem(backpack, workbench, 'rain-barrel');
   const hasTrap = hasOwnedItem(backpack, workbench, 'simple-trap');
   const hasWrap = hasOwnedItem(backpack, workbench, 'waterproof-wrap');
   const hasContainer = hasOwnedItem(backpack, workbench, 'clean-container');
+  const hasBedding = hasOwnedItem(backpack, workbench, 'warm-bedding');
   const hasTotem = hasOwnedItem(backpack, workbench, 'spirit-totem');
 
   if (hasCampfire && (nextPhase === 'dusk' || nextPhase === 'night')) {
@@ -1127,21 +1292,27 @@ const getPassiveTransitionOutcome = (
     logs.push('精神支柱让你在夜里没有完全散掉。');
   }
 
-  if (hasCollector && (nextEnvironment.weather === 'rain' || nextEnvironment.weather === 'storm')) {
-    const waterYield = hasContainer ? 2 : 1;
+  if (hasBedding && nextPhase === 'night') {
+    nextPlayer = applyStatChanges(nextPlayer, { temperature: 4, fatigue: 5, sanity: 2 });
+    logs.push('简易卧铺让这个夜晚没那么磨人。');
+  }
+
+  if ((hasCollector || hasRainBarrel) && (nextEnvironment.weather === 'rain' || nextEnvironment.weather === 'storm')) {
+    const waterYield = (hasCollector ? 1 : 0) + (hasRainBarrel ? 1 : 0) + (hasContainer ? 1 : 0);
     const collected = addItemsToBackpack(nextBackpack, [{ itemId: 'fresh-water', amount: waterYield }]);
     nextBackpack = collected.backpack;
     logs.push(
       collected.overflow.length > 0
         ? '集水装置接到了淡水，但背包太满没能全部收下。'
-        : `集水装置接到了 ${waterYield} 份淡水。`,
+        : `储水装置接到了 ${waterYield} 份淡水。`,
     );
   }
 
   if (hasTrap && startOfNewDay) {
     const trapRoll = Math.random();
     if (trapRoll < 0.5) {
-      const trappedItemId = trapRoll < 0.18 ? 'raw-fish' : trapRoll < 0.38 ? 'berries' : 'beast-hide';
+      const trappedItemId =
+        trapRoll < 0.16 ? 'raw-fish' : trapRoll < 0.34 ? 'berries' : trapRoll < 0.44 ? 'insect-protein' : 'beast-hide';
       const trapped = addItemsToBackpack(nextBackpack, [{ itemId: trappedItemId, amount: 1 }]);
       nextBackpack = trapped.backpack;
       const trappedItemName = itemById.get(trappedItemId)?.name ?? trappedItemId;
@@ -1620,9 +1791,32 @@ const applySleepRecovery = (player: PlayerState) =>
     health: 3,
   });
 const terrainDropPool: Record<EnvironmentState['terrain'], string[]> = {
-  beach: ['green-coconut', 'green-coconut', 'driftwood', 'driftwood', 'pebble', 'pebble', 'palm-leaf', 'vine', 'campfire-kit'],
-  jungle: ['driftwood', 'vine', 'vine', 'herb', 'herb', 'bamboo', 'bamboo', 'berries', 'green-coconut'],
-  cave: ['flint', 'flint', 'stone', 'stone', 'herb', 'pebble', 'fresh-water'],
+  beach: [
+    'green-coconut',
+    'green-coconut',
+    'driftwood',
+    'driftwood',
+    'pebble',
+    'pebble',
+    'palm-leaf',
+    'vine',
+    'campfire-kit',
+    'floating-rope',
+  ],
+  jungle: [
+    'driftwood',
+    'vine',
+    'vine',
+    'herb',
+    'herb',
+    'bamboo',
+    'bamboo',
+    'berries',
+    'green-coconut',
+    'insect-protein',
+    'beast-hide',
+  ],
+  cave: ['flint', 'flint', 'stone', 'stone', 'herb', 'pebble', 'fresh-water', 'insect-protein'],
 };
 const pickRandomTerrainDrops = (terrain: EnvironmentState['terrain']) => {
   const pool = terrainDropPool[terrain];
@@ -2235,7 +2429,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const consumedBackpack = consumeItemsFromBackpack(state.backpack, recipe.requires);
+    const consumedBackpack = consumeItemsFromBackpack(
+      state.backpack,
+      getRecipeConsumedRequirements(recipe),
+    );
     const craftedResult = addItemsToBackpack(consumedBackpack, recipe.produces);
     const outputText = recipe.produces
       .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
@@ -2250,6 +2447,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       shelterBuilt:
         state.progress.shelterBuilt ||
         recipe.produces.some((entry) => entry.itemId === 'temporary-shelter'),
+      spearCrafted:
+        state.progress.spearCrafted ||
+        recipe.produces.some((entry) => entry.itemId === 'spear'),
       beaconCrafted:
         state.progress.beaconCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),
@@ -2316,6 +2516,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       shelterBuilt:
         state.progress.shelterBuilt ||
         recipe.produces.some((entry) => entry.itemId === 'temporary-shelter'),
+      spearCrafted:
+        state.progress.spearCrafted ||
+        recipe.produces.some((entry) => entry.itemId === 'spear'),
       beaconCrafted:
         state.progress.beaconCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),

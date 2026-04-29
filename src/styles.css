@@ -891,6 +891,17 @@ button {
   color: var(--ink-faint);
 }
 
+.recipe-discovery-note {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(215, 177, 92, 0.4);
+  background: rgba(215, 177, 92, 0.12);
+  color: #e9cf83;
+  font-size: 10px;
+}
+
 .recipe-eq {
   display: flex;
   align-items: center;

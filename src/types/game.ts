@@ -69,6 +69,7 @@ export interface PrototypeProgress {
   campfireCrafted: boolean;
   spearCrafted: boolean;
   beaconCrafted: boolean;
+  discoveredRecipeIds: string[];
   lastActionSummary: string;
   resolvedCrises: string[];
   journal: JournalEntry[];

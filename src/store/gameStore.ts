@@ -70,6 +70,13 @@ const HAND_SIZE = 4;
 const BACKPACK_SIZE = 12;
 const BACKPACK_MAX_WEIGHT = 18;
 const TOTAL_DAYS = 7;
+const INITIAL_DISCOVERED_RECIPE_IDS = [
+  'stone-knife',
+  'open-green-coconut',
+  'tap-coconut-water',
+  'campfire',
+  'temporary-shelter',
+];
 const PHASE_ORDER: EnvironmentState['timeOfDay'][] = ['day', 'dusk', 'night'];
 const PHASE_ACTION_LIMIT: Record<EnvironmentState['timeOfDay'], number> = {
   day: 8 * 30,
@@ -108,6 +115,7 @@ const initialProgress = (): PrototypeProgress => ({
   campfireCrafted: false,
   spearCrafted: false,
   beaconCrafted: false,
+  discoveredRecipeIds: INITIAL_DISCOVERED_RECIPE_IDS,
   lastActionSummary: '你刚刚从海水里爬上岸，还没有真正开始求生。',
   resolvedCrises: [],
   journal: [],
@@ -1019,6 +1027,26 @@ const canCraftRecipeFromBackpack = (backpack: BackpackSlot[], recipe: CraftingRe
   return recipe.requires.every((requirement) => (itemCounts.get(requirement.itemId) ?? 0) >= requirement.amount);
 };
 
+const isRecipeDiscovered = (progress: PrototypeProgress, recipeId: string) =>
+  progress.discoveredRecipeIds.includes(recipeId);
+
+const discoverRecipe = (progress: PrototypeProgress, recipe: CraftingRecipe) => {
+  if (isRecipeDiscovered(progress, recipe.id)) {
+    return {
+      progress,
+      discovered: false,
+    };
+  }
+
+  return {
+    progress: {
+      ...progress,
+      discoveredRecipeIds: [recipe.id, ...progress.discoveredRecipeIds],
+    },
+    discovered: true,
+  };
+};
+
 const countOwnedItems = (backpack: BackpackSlot[], workbench: WorkbenchCard[]) => {
   const counts = countSlotItems(backpack);
 
@@ -1235,6 +1263,42 @@ const removeWorkbenchCardsForRecipe = (
 
     return true;
   });
+};
+
+const getStormWorkbenchDamage = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+) => {
+  const hasShelter = hasOwnedItem(backpack, workbench, 'temporary-shelter');
+  const hasWrap = hasOwnedItem(backpack, workbench, 'waterproof-wrap');
+  const maxLoss = hasShelter && hasWrap ? 0 : hasShelter || hasWrap ? 1 : 3;
+
+  if (maxLoss === 0) {
+    return {
+      workbench,
+      lost: [] as string[],
+    };
+  }
+
+  const vulnerableItems = new Set([
+    'palm-leaf',
+    'vine',
+    'berries',
+    'herb',
+    'insect-protein',
+    'campfire-kit',
+    'coconut-husk',
+    'fresh-water',
+    'floating-rope',
+  ]);
+  const candidates = workbench.filter((card) => vulnerableItems.has(card.itemId));
+  const lostCards = candidates.slice(0, maxLoss);
+  const lostIds = new Set(lostCards.map((card) => card.id));
+
+  return {
+    workbench: cloneWorkbench(workbench).filter((card) => !lostIds.has(card.id)),
+    lost: lostCards.map((card) => itemById.get(card.itemId)?.name ?? card.itemId),
+  };
 };
 
 const countTotalOwnedItem = (
@@ -2010,10 +2074,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     const finalEffect = mergeEffects(option.effect, contextBonus.effect);
     const applied = applyEffect(state.player, state.environment, finalEffect);
     const inventoryResult = addItemsToBackpack(state.backpack, finalEffect.gainItems);
+    const stormDamage =
+      event.id === 'storm-impact'
+        ? getStormWorkbenchDamage(inventoryResult.backpack, state.workbench)
+        : { workbench: state.workbench, lost: [] };
     const nextHand = rotateDeck(state.deck, state.hand, finalEffect.drawCards ?? 0);
     const overflowText =
       inventoryResult.overflow.length > 0 ? ` 背包太满，没能收下：${inventoryResult.overflow.join('、')}。` : '';
     const bonusText = contextBonus.notes.length > 0 ? ` ${contextBonus.notes.join('')}` : '';
+    const stormLossText =
+      stormDamage.lost.length > 0
+        ? ` 暴风雨冲散了工作台上的${stormDamage.lost.join('、')}。`
+        : event.id === 'storm-impact'
+          ? ' 你的准备保住了台面上的关键物资。'
+          : '';
 
     set((current) => ({
       player: applied.player,
@@ -2024,10 +2098,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         resolvedCrises: [event.title, ...current.progress.resolvedCrises].slice(0, 6),
       },
       backpack: inventoryResult.backpack,
+      workbench: stormDamage.workbench,
+      selectedWorkbenchCardId: stormDamage.workbench.some((card) => card.id === current.selectedWorkbenchCardId)
+        ? current.selectedWorkbenchCardId
+        : null,
       hand: nextHand,
       activeEvent: null,
       logs: [
-        createLog(`【${event.title}】${option.resultText}${bonusText}${overflowText}`),
+        createLog(`【${event.title}】${option.resultText}${bonusText}${overflowText}${stormLossText}`),
         ...current.logs,
       ].slice(0, 10),
     }));
@@ -2473,6 +2551,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
+    if (!isRecipeDiscovered(state.progress, recipe.id)) {
+      set((current) => ({
+        logs: [createLog(`你还没有掌握【${recipe.name}】这条配方。`), ...current.logs].slice(0, 10),
+      }));
+      return;
+    }
+
     if (!canCraftRecipeFromOwned(state.backpack, state.workbench, recipe)) {
       set((current) => ({
         logs: [createLog(`【${recipe.name}】材料不足，无法合成。`), ...current.logs].slice(0, 10),
@@ -2576,8 +2661,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const outputText = recipe.produces
       .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
       .join('、');
+    const discovery = discoverRecipe(state.progress, recipe);
+    const nextPlayer = discovery.discovered
+      ? applyStatChanges(applyEffortDrain(state.player, actionCost), { sanity: 4 })
+      : applyEffortDrain(state.player, actionCost);
     const nextProgress: PrototypeProgress = {
-      ...state.progress,
+      ...discovery.progress,
       campfireCrafted:
         state.progress.campfireCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'campfire'),
@@ -2590,19 +2679,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       beaconCrafted:
         state.progress.beaconCrafted ||
         recipe.produces.some((entry) => entry.itemId === 'signal-beacon'),
-      lastActionSummary: `我把材料在工作台上叠到一起，手动完成了“${recipe.name}”。`,
+      lastActionSummary: discovery.discovered
+        ? `我把材料在工作台上叠到一起，意外摸索出了“${recipe.name}”。`
+        : `我把材料在工作台上叠到一起，手动完成了“${recipe.name}”。`,
     };
+    const discoveryLog = discovery.discovered
+      ? [createLog(`发现新配方：${recipe.name}。这条荒野知识已经写进营地手册。`)]
+      : [];
 
     set((current) => ({
       progress: nextProgress,
       environment: spendActions(current.environment, timeCost),
-      player: applyEffortDrain(current.player, actionCost),
+      player: nextPlayer,
       backpack: current.backpack,
       workbench: nextWorkbench,
       selectedWorkbenchCardId: nextSelectedWorkbenchCardId,
       selectedBackpackSlot: null,
       logs: [
         createLog(`手动合成成功：${recipe.name}。产出 ${outputText}。`),
+        ...discoveryLog,
         ...current.logs,
       ].slice(0, 10),
     }));

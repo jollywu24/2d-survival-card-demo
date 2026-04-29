@@ -200,9 +200,15 @@ function App() {
     [selectedWorkbenchCard, workbench],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
+  const workbenchRecipeDiscovered =
+    !!workbenchRecipe && progress.discoveredRecipeIds.includes(workbenchRecipe.id);
+  const discoveredRecipes = useMemo(
+    () => allCraftingRecipes.filter((recipe) => progress.discoveredRecipeIds.includes(recipe.id)),
+    [progress.discoveredRecipeIds],
+  );
   const recipeBookEntries = useMemo(
     () => {
-      const entries = allCraftingRecipes
+      const entries = discoveredRecipes
         .map((recipe) => ({
           recipe,
           craftable: canCraftWithOwnedItems(backpack, workbench, recipe),
@@ -224,22 +230,13 @@ function App() {
           return left.recipe.name.localeCompare(right.recipe.name, 'zh-Hans-CN');
         });
 
-      if (entries.length > 0 || recipeFilter === 'all') {
-        return entries;
-      }
-
-      return allCraftingRecipes
-        .map((recipe) => ({
-          recipe,
-          craftable: canCraftWithOwnedItems(backpack, workbench, recipe),
-        }))
-        .sort((left, right) => Number(right.craftable) - Number(left.craftable));
+      return entries;
     },
-    [backpack, workbench, recipeFilter],
+    [backpack, discoveredRecipes, recipeFilter, workbench],
   );
   const readyRecipeCount = useMemo(
-    () => allCraftingRecipes.filter((recipe) => canCraftWithOwnedItems(backpack, workbench, recipe)).length,
-    [backpack, workbench],
+    () => discoveredRecipes.filter((recipe) => canCraftWithOwnedItems(backpack, workbench, recipe)).length,
+    [backpack, discoveredRecipes, workbench],
   );
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
@@ -1045,6 +1042,9 @@ function App() {
                     {workbenchRecipe ? (
                       <>
                         <div className="recipe-line">{workbenchRecipe.description}</div>
+                        {!workbenchRecipeDiscovered && (
+                          <div className="recipe-discovery-note">未记录配方 · 合成后写入营地手册</div>
+                        )}
                         <div className="recipe-eq">
                           {workbenchRecipe.requires.map((entry) => (
                             <span key={`req-${entry.itemId}`} className="recipe-token">
@@ -1091,7 +1091,7 @@ function App() {
                   <div>
                     <div className="recipe-title">制作栏</div>
                     <div className="recipe-book-sub">
-                      {readyRecipeCount}/{allCraftingRecipes.length} 可制作
+                      {readyRecipeCount}/{discoveredRecipes.length} 可制作 · 已发现 {discoveredRecipes.length}/{allCraftingRecipes.length}
                     </div>
                   </div>
                   <span className="recipe-book-mark">营地手册</span>
@@ -1152,7 +1152,7 @@ function App() {
                     </div>
                   )) : (
                     <div className="recipe-book-empty">
-                      暂无该分类配方
+                      暂无该分类配方，继续尝试堆叠材料来发现新知识
                     </div>
                   )}
                 </div>

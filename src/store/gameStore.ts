@@ -1019,6 +1019,25 @@ const canCraftRecipeFromBackpack = (backpack: BackpackSlot[], recipe: CraftingRe
   return recipe.requires.every((requirement) => (itemCounts.get(requirement.itemId) ?? 0) >= requirement.amount);
 };
 
+const countOwnedItems = (backpack: BackpackSlot[], workbench: WorkbenchCard[]) => {
+  const counts = countSlotItems(backpack);
+
+  workbench.forEach((card) => {
+    counts.set(card.itemId, (counts.get(card.itemId) ?? 0) + 1);
+  });
+
+  return counts;
+};
+
+const canCraftRecipeFromOwned = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  recipe: CraftingRecipe,
+) => {
+  const itemCounts = countOwnedItems(backpack, workbench);
+  return recipe.requires.every((requirement) => (itemCounts.get(requirement.itemId) ?? 0) >= requirement.amount);
+};
+
 const getRecipeConsumedRequirements = (recipe: CraftingRecipe) => {
   const preserveCounts = new Map<string, number>();
   (recipe.preserves ?? []).forEach((entry) => {
@@ -1136,6 +1155,50 @@ const consumeItemsFromBackpack = (backpack: BackpackSlot[], requirements: ItemSt
   });
 
   return nextBackpack;
+};
+
+const consumeItemsFromOwned = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  requirements: ItemStackChange[],
+) => {
+  const nextBackpack = cloneBackpack(backpack);
+  const remaining = new Map(requirements.map((entry) => [entry.itemId, entry.amount]));
+
+  nextBackpack.forEach((slot) => {
+    if (!slot.itemId || slot.amount <= 0) {
+      return;
+    }
+
+    const required = remaining.get(slot.itemId) ?? 0;
+    if (required <= 0) {
+      return;
+    }
+
+    const consumed = Math.min(slot.amount, required);
+    slot.amount -= consumed;
+    remaining.set(slot.itemId, required - consumed);
+
+    if (slot.amount <= 0) {
+      slot.itemId = null;
+      slot.amount = 0;
+    }
+  });
+
+  const nextWorkbench = cloneWorkbench(workbench).filter((card) => {
+    const required = remaining.get(card.itemId) ?? 0;
+    if (required <= 0) {
+      return true;
+    }
+
+    remaining.set(card.itemId, required - 1);
+    return false;
+  });
+
+  return {
+    backpack: nextBackpack,
+    workbench: nextWorkbench,
+  };
 };
 
 const removeWorkbenchCardsForRecipe = (
@@ -2410,7 +2473,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    if (!canCraftRecipeFromBackpack(state.backpack, recipe)) {
+    if (!canCraftRecipeFromOwned(state.backpack, state.workbench, recipe)) {
       set((current) => ({
         logs: [createLog(`【${recipe.name}】材料不足，无法合成。`), ...current.logs].slice(0, 10),
       }));
@@ -2429,11 +2492,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const consumedBackpack = consumeItemsFromBackpack(
+    const consumedOwned = consumeItemsFromOwned(
       state.backpack,
+      state.workbench,
       getRecipeConsumedRequirements(recipe),
     );
-    const craftedResult = addItemsToBackpack(consumedBackpack, recipe.produces);
+    const craftedResult = addItemsToBackpack(consumedOwned.backpack, recipe.produces);
     const outputText = recipe.produces
       .map((entry) => `${itemById.get(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
       .join('、');
@@ -2461,6 +2525,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       environment: spendActions(current.environment, timeCost),
       player: applyEffortDrain(current.player, actionCost),
       backpack: craftedResult.backpack,
+      workbench: consumedOwned.workbench,
+      selectedWorkbenchCardId: consumedOwned.workbench.some((card) => card.id === current.selectedWorkbenchCardId)
+        ? current.selectedWorkbenchCardId
+        : null,
       logs: [createLog(`你在工作台合成了【${recipe.name}】：${outputText}。${overflowText}`), ...current.logs].slice(0, 10),
     }));
   },
@@ -2703,6 +2771,16 @@ export const getBackpackCurrentWeight = (backpack: BackpackSlot[]) => getBackpac
 export const getItemCarryWeight = (itemId: string | null) => (itemId ? getItemWeight(itemId) : 0);
 export const canCraftInBackpack = (backpack: BackpackSlot[], recipe: CraftingRecipe) =>
   canCraftRecipeFromBackpack(backpack, recipe);
+export const canCraftWithOwnedItems = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  recipe: CraftingRecipe,
+) => canCraftRecipeFromOwned(backpack, workbench, recipe);
+export const getOwnedItemCount = (
+  backpack: BackpackSlot[],
+  workbench: WorkbenchCard[],
+  itemId: string,
+) => countOwnedItems(backpack, workbench).get(itemId) ?? 0;
 export const getWorkbenchRecipePreview = (
   workbench: WorkbenchCard[],
   selectedWorkbenchCardId: string | null,

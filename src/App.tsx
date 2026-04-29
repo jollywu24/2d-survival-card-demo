@@ -3,10 +3,11 @@ import {
   allCraftingRecipes,
   allPrototypeGoals,
   backpackMaxWeight,
-  canCraftInBackpack,
+  canCraftWithOwnedItems,
   getBackpackCurrentWeight,
   getItemDefinition,
   getItemCarryWeight,
+  getOwnedItemCount,
   getWorkbenchRecipePreview,
   isPrototypeGoalComplete,
   terrainLabel,
@@ -137,6 +138,7 @@ function App() {
     useBackpackItem,
     discardBackpackItem,
     exploreTerrainDrops,
+    craftRecipe,
     craftWorkbenchRecipe,
   } = useGameStore();
   const [journalOpen, setJournalOpen] = useState(false);
@@ -175,9 +177,15 @@ function App() {
     [selectedWorkbenchCard, workbench],
   );
   const workbenchRecipe = getWorkbenchRecipePreview(workbench, selectedWorkbenchCardId);
-  const craftableBackpackRecipes = useMemo(
-    () => allCraftingRecipes.filter((recipe) => canCraftInBackpack(backpack, recipe)),
-    [backpack],
+  const recipeBookEntries = useMemo(
+    () =>
+      allCraftingRecipes
+        .map((recipe) => ({
+          recipe,
+          craftable: canCraftWithOwnedItems(backpack, workbench, recipe),
+        }))
+        .sort((left, right) => Number(right.craftable) - Number(left.craftable)),
+    [backpack, workbench],
   );
   const activeGoal = allPrototypeGoals.find(
     (goal) => goal.day === Math.min(environment.day, progress.totalDays),
@@ -1023,6 +1031,58 @@ function App() {
                 ) : (
                   <div className="recipe-line">先选中一张工作台上的卡，预览只针对当前堆叠。</div>
                 )}
+              </div>
+              <div className="recipe-book">
+                <div className="recipe-book-head">
+                  <div>
+                    <div className="recipe-title">合成列表</div>
+                    <div className="recipe-book-sub">
+                      {recipeBookEntries.filter((entry) => entry.craftable).length}/{allCraftingRecipes.length} 可制作
+                    </div>
+                  </div>
+                  <span className="recipe-book-mark">营地手册</span>
+                </div>
+                <div className="recipe-book-list">
+                  {recipeBookEntries.map(({ recipe, craftable }) => (
+                    <div key={recipe.id} className={`recipe-book-item ${craftable ? 'ready' : ''}`}>
+                      <div className="recipe-book-main">
+                        <div className="recipe-book-name">
+                          {getItemDefinition(recipe.produces[0]?.itemId ?? null)?.icon}
+                          <span>{recipe.name}</span>
+                        </div>
+                        <div className="recipe-book-output">
+                          {recipe.produces
+                            .map((entry) => `${getItemDefinition(entry.itemId)?.name ?? entry.itemId} x${entry.amount}`)
+                            .join('、')}
+                        </div>
+                      </div>
+                      <div className="recipe-book-reqs">
+                        {recipe.requires.map((entry) => {
+                          const owned = getOwnedItemCount(backpack, workbench, entry.itemId);
+                          const enough = owned >= entry.amount;
+                          return (
+                            <span
+                              key={`${recipe.id}-${entry.itemId}`}
+                              className={`recipe-req-chip ${enough ? 'met' : 'missing'}`}
+                            >
+                              {getItemDefinition(entry.itemId)?.name ?? entry.itemId} {owned}/{entry.amount}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        className="recipe-craft-icon"
+                        disabled={!craftable || !!activeEvent || !!ending}
+                        onClick={() => craftRecipe(recipe.id)}
+                        title={craftable ? `制作 ${recipe.name}` : '材料不足'}
+                        aria-label={craftable ? `制作 ${recipe.name}` : `${recipe.name} 材料不足`}
+                      >
+                        {craftable ? '制' : '缺'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

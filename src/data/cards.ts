@@ -13,6 +13,7 @@ export const starterDeck: CardDefinition[] = [
       gainWorkbenchItems: [
         { itemId: 'pebble', amount: 2 },
         { itemId: 'green-coconut', amount: 1 },
+        { itemId: 'stick', amount: 1 },
       ],
     },
     condition: {
@@ -208,7 +209,10 @@ export const starterDeck: CardDefinition[] = [
     description: '沿着潮线和林边收集可用的木材，为火源和工具做准备。',
     effect: {
       statChanges: { fatigue: -8, thirst: -3 },
-      gainItems: [{ itemId: 'driftwood', amount: 2 }],
+      gainItems: [
+        { itemId: 'driftwood', amount: 2 },
+        { itemId: 'stick', amount: 1 },
+      ],
     },
     condition: {
       allowedTerrains: ['beach', 'jungle'],
@@ -244,6 +248,7 @@ export const starterDeck: CardDefinition[] = [
       eventChanceBonus: 0.05,
       gainItems: [
         { itemId: 'driftwood', amount: 1 },
+        { itemId: 'stick', amount: 1 },
         { itemId: 'vine', amount: 1 },
         { itemId: 'campfire-kit', amount: 1 },
       ],
